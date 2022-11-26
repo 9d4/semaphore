@@ -15,3 +15,6 @@
 # vendor/
 
 .env
+
+# exclude logs
+*.log

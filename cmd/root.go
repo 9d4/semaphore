@@ -2,9 +2,11 @@ package cmd
 
 import (
 	"log"
+	"os"
 
 	"github.com/9d4/semaphore/server"
 	"github.com/spf13/cobra"
+	jww "github.com/spf13/jwalterweatherman"
 	flag "github.com/spf13/pflag"
 	"github.com/spf13/viper"
 )
@@ -22,7 +24,7 @@ var serverFlags = flag.NewFlagSet(rootCmd.Name(), flag.ContinueOnError)
 
 func init() {
 	initFlags()
-	cobra.OnInitialize(initConfig)
+	cobra.OnInitialize(func() { initConfig(); initLogger() })
 
 	rootCmd.PersistentFlags().AddFlagSet(serverFlags)
 	viper.BindPFlags(serverFlags)
@@ -40,4 +42,18 @@ func initFlags() {
 	serverFlags.String("dbhost", "127.0.0.1", "Database host")
 	serverFlags.String("dbport", "5432", "Database port")
 	serverFlags.String("dbname", "semaphore", "Database name")
+}
+
+func initLogger() {
+	logWriter, err := os.OpenFile("semaphore.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	if err != nil {
+		log.Println("Unable to create log file:", err)
+	}
+
+	if err == nil {
+		jww.SetLogOutput(logWriter)
+	}
+
+	jww.SetLogThreshold(jww.LevelTrace)
+	jww.SetStdoutThreshold(jww.LevelInfo)
 }
