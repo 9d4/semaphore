@@ -1,6 +1,9 @@
 package server
 
-import "github.com/gofiber/fiber/v2"
+import (
+	"github.com/gofiber/fiber/v2"
+	"github.com/spf13/viper"
+)
 
 var app fiber.App
 
@@ -9,5 +12,5 @@ func Start() error {
 
 	setupRoutes(&app)
 
-	return app.Listen("0.0.0.0:3500")
+	return app.Listen(viper.GetString("addr"))
 }
