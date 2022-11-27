@@ -33,6 +33,7 @@ func init() {
 func initConfig() {
 	viper.AddConfigPath(".")
 	viper.SetConfigName(".env")
+	viper.SetConfigType("env")
 	viper.AutomaticEnv()
 	viper.ReadInConfig()
 }
