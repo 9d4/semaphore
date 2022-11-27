@@ -16,7 +16,7 @@ var rootCmd = cobra.Command{
 	Short: "Start semaphore server.",
 	Long:  "Semaphore is blablabla..........",
 	Run: boot(func(cmd *cobra.Command, args []string, passData *bootData) {
-		log.Fatal(server.Start())
+		log.Fatal(server.Start(passData.db, passData.store))
 	}),
 }
 
