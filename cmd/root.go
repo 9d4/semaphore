@@ -42,6 +42,7 @@ func initFlags() {
 	serverFlags.String("dbhost", "127.0.0.1", "Database host")
 	serverFlags.String("dbport", "5432", "Database port")
 	serverFlags.String("dbname", "semaphore", "Database name")
+	serverFlags.String("dbuser", "semaphore", "Database user")
 	serverFlags.String("dbpasswd", "smphr", "Database password")
 }
 
