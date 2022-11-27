@@ -15,9 +15,9 @@ type server struct {
 }
 
 func (s *server) setupRoutes() {
-	s.app.Get("/", func(c *fiber.Ctx) error {
-		c.WriteString("Merhaba 👋🏼")
-		return nil
+	s.app.Static("/", "./views/dist/", fiber.Static{
+		Compress: true,
+		Browse:   false,
 	})
 
 	apiSrv := newApiServer(s.db, s.store)
