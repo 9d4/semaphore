@@ -45,6 +45,8 @@ func initFlags() {
 	serverFlags.String("dbname", "semaphore", "Database name")
 	serverFlags.String("dbuser", "semaphore", "Database user")
 	serverFlags.String("dbpasswd", "smphr", "Database password")
+	serverFlags.Bool("seed", false, "Run database seeder")
+	serverFlags.Bool("gen-key", false, "Generate app key and print to screen")
 }
 
 func initLogger() {
