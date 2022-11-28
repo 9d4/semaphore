@@ -3,6 +3,7 @@ package server
 import (
 	"errors"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/9d4/semaphore/store"
@@ -34,6 +35,10 @@ type accessToken struct {
 	jwt.RegisteredClaims
 }
 
+type refreshToken struct {
+	jwt.RegisteredClaims
+}
+
 const (
 	AccessTokenExpirationTime  = time.Minute * 15
 	RefreshTokenExpirationTime = time.Hour * 48
@@ -53,6 +58,7 @@ func newApiServer(db *gorm.DB, store store.Store) *apiServer {
 
 func (s *apiServer) setupRoutes() {
 	s.app.Post("/login", s.handleLogin)
+	s.app.Post("/renew", s.handleRenew)
 }
 
 func (s *apiServer) handleLogin(c *fiber.Ctx) error {
@@ -77,11 +83,51 @@ func (s *apiServer) handleLogin(c *fiber.Ctx) error {
 		return writeError(c, ErrCredentialNotFound)
 	}
 
+	// if url contains query "check=1" then don't generate token
+	if c.Query("check") == "1" {
+		return c.SendStatus(200)
+	}
+
 	tokenPair, err := s.generateTokenPair(usr)
 	if err != nil {
 		return fiber.ErrInternalServerError
 	}
 
+	return c.JSON(tokenPair)
+}
+
+// This endpoint is not truly rest. It takes cookie containing
+// refresh token set by server.
+func (s *apiServer) handleRenew(c *fiber.Ctx) error {
+	rtRaw := c.Cookies("rt")
+	if rtRaw == "" {
+		return fiber.ErrUnauthorized
+	}
+
+	var rt refreshToken
+
+	token, err := jwt.ParseWithClaims(rtRaw, &rt, jwtKeyFunc([]byte(s.v.GetString("app_key"))))
+	if err != nil || !token.Valid {
+		return fiber.ErrUnauthorized
+	}
+
+	subjectID, err := strconv.Atoi(rt.Subject)
+	if err != nil {
+		return fiber.ErrInternalServerError
+	}
+
+	var usr user.User
+	result := s.db.First(&usr, user.User{Model: gorm.Model{ID: uint(subjectID)}})
+	if result.Error != nil {
+		return fiber.ErrUnauthorized
+	}
+
+	tokenPair, err := s.generateTokenPair(usr)
+	if err != nil {
+		return fiber.ErrUnauthorized
+	}
+
+	c.SendStatus(fiber.StatusCreated)
 	return c.JSON(tokenPair)
 }
 
@@ -132,4 +178,10 @@ func generateRefreshToken(usr user.User, key []byte, expiresIn time.Duration) (s
 	rt := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 
 	return rt.SignedString(key)
+}
+
+func jwtKeyFunc(key []byte) jwt.Keyfunc {
+	return func(t *jwt.Token) (interface{}, error) {
+		return key, nil
+	}
 }
