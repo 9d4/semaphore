@@ -65,7 +65,7 @@ func (s *server) handleLogin(c *fiber.Ctx) error {
 	c.Cookie(&fiber.Cookie{
 		Name:     "rt",
 		Value:    rt,
-		Domain:   "semaphore.test",
+		Domain:   s.v.GetString("cookie_domain"),
 		Expires:  time.Now().Add(RefreshTokenExpirationTime),
 		HTTPOnly: true,
 	})

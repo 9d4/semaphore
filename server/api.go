@@ -128,10 +128,18 @@ func (s *apiServer) handleRenew(c *fiber.Ctx) error {
 	}
 
 	c.SendStatus(fiber.StatusCreated)
+	c.Cookie(&fiber.Cookie{
+		Name:     "rt",
+		Value:    tokenPair["refresh_token"],
+		Domain:   s.v.GetString("cookie_domain"),
+		Expires:  time.Now().Add(RefreshTokenExpirationTime),
+		HTTPOnly: true,
+	})
+
 	return c.JSON(tokenPair)
 }
 
-func (s *apiServer) generateTokenPair(usr user.User) (map[string]interface{}, error) {
+func (s *apiServer) generateTokenPair(usr user.User) (map[string]string, error) {
 	key := []byte(s.v.GetString("app_key"))
 
 	at, err := generateAccessToken(usr, key, AccessTokenExpirationTime)
@@ -146,7 +154,7 @@ func (s *apiServer) generateTokenPair(usr user.User) (map[string]interface{}, er
 		return nil, err
 	}
 
-	return map[string]interface{}{
+	return map[string]string{
 		"access_token":  at,
 		"refresh_token": rt,
 	}, nil
