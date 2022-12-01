@@ -46,11 +46,9 @@ export default {
       () => this.$route.params,
       () => {
         this.update();
-      }
+      },
+      { immediate: true }
     );
-  },
-  mounted() {
-    this.update();
   },
   methods: {
     update() {
