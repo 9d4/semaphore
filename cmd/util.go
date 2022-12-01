@@ -53,13 +53,6 @@ func boot(fn bootFunc) cobraFunc {
 		store.MigrateAll(db)
 		jww.INFO.Print("done.")
 
-		// seed?
-		if v.GetBool("seed") {
-			jww.INFO.Print("Seeding database...")
-			store.Seed(data.store)
-			jww.INFO.Print("done.")
-		}
-
 		fn(cmd, args, data)
 	}
 }

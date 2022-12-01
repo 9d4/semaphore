@@ -23,11 +23,16 @@ var rootCmd = cobra.Command{
 var serverFlags = flag.NewFlagSet(rootCmd.Name(), flag.ContinueOnError)
 
 func init() {
+	registerCommands()
 	initFlags()
 	cobra.OnInitialize(func() { initConfig(); initLogger() })
 
 	rootCmd.PersistentFlags().AddFlagSet(serverFlags)
 	viper.BindPFlags(serverFlags)
+}
+
+func registerCommands() {
+	rootCmd.AddCommand(dbCmd)
 }
 
 func initConfig() {
@@ -45,7 +50,6 @@ func initFlags() {
 	serverFlags.String("dbname", "semaphore", "Database name")
 	serverFlags.String("dbuser", "semaphore", "Database user")
 	serverFlags.String("dbpasswd", "smphr", "Database password")
-	serverFlags.Bool("seed", false, "Run database seeder")
 	serverFlags.Bool("gen-key", false, "Generate app key and print to screen")
 }
 
