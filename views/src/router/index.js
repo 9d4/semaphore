@@ -27,7 +27,7 @@ const router = createRouter({
 router.beforeEach((to) => {
   const authStore = useAuthStore();
   if (!authStore.isLogged && to.name !== "login") {
-    return { name: "login" };
+    return { name: "login", query: to.query };
   }
 });
 
