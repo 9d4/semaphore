@@ -1,9 +1,11 @@
 package server
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/9d4/semaphore/store"
@@ -38,6 +40,8 @@ type accessToken struct {
 type refreshToken struct {
 	jwt.RegisteredClaims
 }
+
+type contextKey string
 
 const (
 	AccessTokenExpirationTime  = time.Minute * 15
@@ -139,6 +143,25 @@ func (s *apiServer) handleRenew(c *fiber.Ctx) error {
 	return c.JSON(tokenPair)
 }
 
+func (s *apiServer) withAuth(c *fiber.Ctx) error {
+	authorizationPrefix := "Bearer "
+	authHeader := c.GetReqHeaders()[fiber.HeaderAuthorization]
+
+	if authHeader == "" {
+		return fiber.ErrUnauthorized
+	}
+
+	token := strings.TrimPrefix(authHeader, authorizationPrefix)
+	at, err := validateAccessToken(token, []byte(s.v.GetString("app_key")))
+	if err != nil {
+		return fiber.ErrUnauthorized
+	}
+
+	ctx := context.WithValue(context.Background(), contextKey("access_token"), at)
+	c.SetUserContext(ctx)
+	return c.Next()
+}
+
 func (s *apiServer) generateTokenPair(usr user.User) (map[string]string, error) {
 	key := []byte(s.v.GetString("app_key"))
 
@@ -192,4 +215,15 @@ func jwtKeyFunc(key []byte) jwt.Keyfunc {
 	return func(t *jwt.Token) (interface{}, error) {
 		return key, nil
 	}
+}
+
+func validateAccessToken(token string, key []byte) (*accessToken, error) {
+	claims := accessToken{}
+
+	tk, err := jwt.ParseWithClaims(token, &claims, jwtKeyFunc(key))
+	if err != nil || !tk.Valid {
+		return nil, err
+	}
+
+	return &claims, nil
 }
