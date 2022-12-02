@@ -26,6 +26,7 @@
 <script>
 document.getElementsByTagName("html")[0].setAttribute("data-theme", "dracula");
 import GreetingTron from "../components/GreetingTron.vue";
+import ProfileList from "../components/ProfileList.vue";
 import { useAuthStore } from "../stores/auth";
 
 export default {
@@ -33,7 +34,7 @@ export default {
     const authStore = useAuthStore();
     return { authStore };
   },
-  components: { GreetingTron },
+  components: { GreetingTron, ProfileList },
   data() {
     return {
       active: "",
@@ -74,6 +75,12 @@ export default {
           this.view = "GreetingTron";
           this.currentViewProps = {
             name: this.authStore.jwt.User.FirstName,
+          };
+          break;
+        case "profile":
+          this.view = "ProfileList";
+          this.currentViewProps = {
+            claims: this.authStore.jwt,
           };
           break;
         default:
