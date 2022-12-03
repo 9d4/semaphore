@@ -63,6 +63,8 @@ func newApiServer(db *gorm.DB, store store.Store) *apiServer {
 func (s *apiServer) setupRoutes() {
 	s.app.Post("/login", s.handleLogin)
 	s.app.Post("/renew", s.handleRenew)
+	users := s.app.Group("users/")
+	users.Get(":userid/profile", s.withAuth, s.handleUsersProfile)
 }
 
 func (s *apiServer) handleLogin(c *fiber.Ctx) error {
@@ -141,6 +143,32 @@ func (s *apiServer) handleRenew(c *fiber.Ctx) error {
 	})
 
 	return c.JSON(tokenPair)
+}
+
+func (s *apiServer) handleUsersProfile(c *fiber.Ctx) error {
+	paramUserID := c.Params("userid")
+	userid, err := strconv.Atoi(paramUserID)
+	if err != nil {
+		return fiber.ErrBadRequest
+	}
+
+	at := new(accessToken)
+	at, ok := c.UserContext().Value(contextKey("access_token")).(*accessToken)
+	if !ok {
+		return fiber.ErrInternalServerError
+	}
+
+	if at.User.ID != uint(userid) {
+		return fiber.ErrForbidden
+	}
+
+	var usr user.User
+	result := s.db.First(&usr, user.User{Model: gorm.Model{ID: at.User.ID}})
+	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+		return writeError(c, ErrCredentialNotFound)
+	}
+
+	return c.JSON(usr)
 }
 
 func (s *apiServer) withAuth(c *fiber.Ctx) error {
