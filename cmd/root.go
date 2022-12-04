@@ -28,7 +28,10 @@ func init() {
 	cobra.OnInitialize(func() { initConfig(); initLogger() })
 
 	rootCmd.PersistentFlags().AddFlagSet(serverFlags)
-	viper.BindPFlags(serverFlags)
+	err := viper.BindPFlags(serverFlags)
+	if err != nil {
+		return
+	}
 }
 
 func registerCommands() {
@@ -40,7 +43,10 @@ func initConfig() {
 	viper.SetConfigName(".env")
 	viper.SetConfigType("env")
 	viper.AutomaticEnv()
-	viper.ReadInConfig()
+	err := viper.ReadInConfig()
+	if err != nil {
+		return
+	}
 }
 
 func initFlags() {
