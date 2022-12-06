@@ -2,6 +2,8 @@ package server
 
 import (
 	"errors"
+	"github.com/9d4/semaphore/util"
+	"github.com/go-redis/redis/v9"
 	"time"
 
 	"github.com/9d4/semaphore/store"
@@ -14,6 +16,7 @@ import (
 type server struct {
 	app   *fiber.App
 	db    *gorm.DB
+	rdb   *redis.Client
 	store store.Store
 	v     *viper.Viper
 }
@@ -26,6 +29,9 @@ func (s *server) setupRoutes() {
 
 	auth := s.app.Group("/auth")
 	auth.Post("/login", s.handleLogin)
+
+	oauthSrv := newOauthServer(s.db, s.rdb)
+	s.app.Mount("/oauth", oauthSrv.app)
 
 	apiSrv := newApiServer(s.db, s.store)
 	s.app.Mount("/api", apiSrv.app)
@@ -57,6 +63,10 @@ func (s *server) handleLogin(c *fiber.Ctx) error {
 		return writeError(c, ErrCredentialNotFound)
 	}
 
+	if !util.VerifyEncoded([]byte(cred.Password), []byte(usr.Password)) {
+		return writeError(c, ErrCredentialNotFound)
+	}
+
 	rt, err := generateRefreshToken(usr, []byte(s.v.GetString("app_key")), RefreshTokenExpirationTime)
 	if err != nil {
 		return err
@@ -70,15 +80,15 @@ func (s *server) handleLogin(c *fiber.Ctx) error {
 		HTTPOnly: true,
 	})
 
-	c.WriteString("redirecting")
 	return c.RedirectBack(c.GetReqHeaders()[fiber.HeaderReferer], 302)
 }
 
-func Start(db *gorm.DB, store store.Store) error {
+func Start(db *gorm.DB, rdb *redis.Client, store store.Store) error {
 	srv := &server{
 		app:   fiber.New(),
 		v:     viper.GetViper(),
 		db:    db,
+		rdb:   rdb,
 		store: store,
 	}
 

@@ -46,7 +46,7 @@
 </template>
 
 <script>
-import { authCheck, authNow } from "../../utils/auth";
+import { authNow } from "@/utils/auth";
 document.getElementsByTagName("html")[0].setAttribute("data-theme", "dark");
 export default {
   data: () => ({
@@ -58,12 +58,19 @@ export default {
   methods: {
     async loginHandler() {
       this.error = "";
-      const ok = await authCheck(this.login, this.password);
-      if (ok) {
-        return authNow();
+      const ok = await authNow(this.login, this.password);
+
+      if (!ok) {
+        this.error = "Credential does not found";
+        return;
       }
 
-      this.error = "Credential does not found";
+      // Check if redirected from oauth/authorize
+      const query = this.$route.query;
+      if (query.from === "oauth_authorize") {
+        // now throw the user back to oauth
+        window.location = `${window.location.origin}/oauth/authorize${window.location.search}`;
+      }
     },
   },
 };

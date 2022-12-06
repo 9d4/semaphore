@@ -255,3 +255,14 @@ func validateAccessToken(token string, key []byte) (*accessToken, error) {
 
 	return &claims, nil
 }
+
+func validateRefreshToken(token string, key []byte) (*refreshToken, error) {
+	claims := refreshToken{}
+
+	tk, err := jwt.ParseWithClaims(token, &claims, jwtKeyFunc(key))
+	if err != nil || !tk.Valid {
+		return nil, err
+	}
+
+	return &claims, nil
+}

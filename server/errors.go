@@ -35,4 +35,6 @@ func writeError(c *fiber.Ctx, err *Error) error {
 // Errors
 var (
 	ErrCredentialNotFound = NewError(fiber.StatusUnauthorized, "auth_failed", "Credential not found")
+
+	ErrOauthClientNotFound = NewError(fiber.StatusNotFound, "oauth_client_not_found", "Client not found")
 )

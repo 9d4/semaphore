@@ -1,60 +1,38 @@
 import { Base64 } from "js-base64";
-import { useAuthStore } from "../stores/auth";
+import { useAuthStore } from "@/stores/auth";
 
-export async function authCheck(email, password) {
-  const cred = { email, password };
-
-  const res = await fetch(`/api/login?check=1`, {
+export async function authNow(email, password) {
+  const res = await fetch(`/auth/login`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(cred),
+    body: JSON.stringify({
+      email,
+      password,
+    }),
   });
 
-  if (res.status == 200) {
-    return true;
-  }
-
-  return false;
-}
-
-export function authNow(email, password) {
-  const formEl = document.createElement("form");
-  formEl.setAttribute("action", "/auth/login");
-  formEl.setAttribute("method", "post");
-
-  const emailEl = document.createElement("input");
-  const passwdEl = document.createElement("password");
-  emailEl.setAttribute("type", "hidden");
-  passwdEl.setAttribute("type", "hidden");
-
-  emailEl.value = email;
-  passwdEl.value = password;
-
-  document.body.append(formEl);
-  formEl.submit();
+  return res.status <= 400;
 }
 
 export async function authRenew() {
-  const res = await fetch(`/api/renew`, {
+  return await fetch(`/api/renew`, {
     method: "POST",
   });
-
-  return res;
 }
 
 export async function validateLogin() {
   const res = await authRenew();
 
-  if (res.status != 201) {
+  if (res.status !== 201) {
     return false;
   }
 
   return res
     .json()
     .then((tokenPair) => {
-      const at = tokenPair.access_token;
+      const at = tokenPair["access_token"];
       const jwt = parseToken(at);
 
       const authStore = useAuthStore();
@@ -74,6 +52,5 @@ export function parseToken(token) {
     throw new Error("token malformed");
   }
 
-  const data = JSON.parse(Base64.decode(parts[1]));
-  return data;
+  return JSON.parse(Base64.decode(parts[1]));
 }

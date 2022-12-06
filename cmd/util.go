@@ -1,10 +1,11 @@
 package cmd
 
 import (
+	"context"
 	"crypto/rand"
 	"fmt"
-
 	"github.com/9d4/semaphore/store"
+	"github.com/go-redis/redis/v9"
 	"github.com/spf13/cobra"
 	jww "github.com/spf13/jwalterweatherman"
 	v "github.com/spf13/viper"
@@ -14,6 +15,7 @@ import (
 
 type bootData struct {
 	db    *gorm.DB
+	rdb   *redis.Client
 	store store.Store
 }
 
@@ -45,8 +47,19 @@ func boot(fn bootFunc) cobraFunc {
 		}
 		data.db = db
 
+		rdb := redis.NewClient(&redis.Options{
+			Addr:     v.GetString("REDIS_ADDR"),
+			Username: v.GetString("REDIS_USERNAME"),
+			Password: v.GetString("REDIS_PASSWORD"),
+		})
+
+		if err = rdb.Ping(context.Background()).Err(); err != nil {
+			jww.FATAL.Fatal(err)
+		}
+
 		// build store
-		data.store = store.NewStore(db)
+		data.rdb = rdb
+		data.store = store.NewStore(db, rdb)
 
 		// auto migrate
 		jww.INFO.Print("Auto Migrating...")
