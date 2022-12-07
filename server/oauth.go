@@ -6,9 +6,12 @@ import (
 	"fmt"
 	"github.com/9d4/semaphore/oauth"
 	"github.com/go-redis/redis/v9"
+	"github.com/golang-jwt/jwt/v4"
 	jww "github.com/spf13/jwalterweatherman"
 	v "github.com/spf13/viper"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"golang.org/x/exp/slices"
@@ -20,6 +23,10 @@ type oauthServer struct {
 	db  *gorm.DB
 	rdb *redis.Client
 }
+
+const (
+	OauthAccessTokenExpirationTime = time.Duration(time.Hour * 24)
+)
 
 func newOauthServer(db *gorm.DB, rdb *redis.Client) *oauthServer {
 	os := &oauthServer{
@@ -35,6 +42,7 @@ func newOauthServer(db *gorm.DB, rdb *redis.Client) *oauthServer {
 func (s *oauthServer) setupRoutes() {
 	s.app.Get("/authorize", s.handleAuthorize)
 	s.app.Post("/authorize", s.withAuth, s.handleAuthorize, s.handleAuthorizePost)
+	s.app.Post("/token", s.handleExchangeToken)
 }
 
 func (s *oauthServer) handleAuthorize(c *fiber.Ctx) error {
@@ -104,7 +112,10 @@ func (s *oauthServer) handleAuthorize(c *fiber.Ctx) error {
 	// the authorization. Now generate authorization code and redirect to
 	// redirect_uri value from query.
 	if c.Method() == fiber.MethodPost {
-		scopesCtx := context.WithValue(context.Background(), contextKey("scopes"), fixedScopes)
+		scopesCtx := context.WithValue(c.UserContext(), contextKey("scopes"), fixedScopes)
+		c.SetUserContext(scopesCtx)
+
+		scopesCtx = context.WithValue(c.UserContext(), contextKey("scopess"), fixedScopes)
 		c.SetUserContext(scopesCtx)
 
 		return c.Next()
@@ -124,12 +135,18 @@ func (s *oauthServer) handleAuthorizePost(c *fiber.Ctx) error {
 		scopes []oauth.Scope
 	)
 
-	scopes, ok := c.UserContext().Value(contextKey("scopes")).([]oauth.Scope)
+	c.UserContext()
+	scopes, ok := c.UserContext().Value(contextKey("scopess")).([]oauth.Scope)
 	if !ok {
 		return fiber.ErrInternalServerError
 	}
 
-	authorizationCode, err := stores.GenerateAuthorizationCode(scopes, c.Query("client_id"))
+	at, ok := c.UserContext().Value(contextKey("access_token")).(*accessToken)
+	if !ok {
+		return fiber.ErrInternalServerError
+	}
+
+	authorizationCode, err := stores.GenerateAuthorizationCode(scopes, c.Query("client_id"), strconv.Itoa(int(at.User.ID)))
 	if err != nil {
 		return fiber.ErrInternalServerError
 	}
@@ -143,6 +160,36 @@ func (s *oauthServer) handleAuthorizePost(c *fiber.Ctx) error {
 
 	return c.JSON(map[string]interface{}{
 		"target_uri": targetUri,
+	})
+}
+
+func (s *oauthServer) handleExchangeToken(c *fiber.Ctx) error {
+	var body struct {
+		Code string `json:"authorization_code"`
+	}
+
+	err := c.BodyParser(&body)
+	if err != nil {
+		return fiber.ErrBadRequest
+	}
+
+	store := oauth.NewStore(s.db, s.rdb)
+	authorizationCode, err := store.GetAuthorizationCode(body.Code)
+	if err != nil {
+		if err == redis.Nil {
+			return fiber.ErrNotFound
+		}
+		jww.TRACE.Println("oauth:handleExchangeToken:error getting auth code detail from cache:", err)
+		return fiber.ErrInternalServerError
+	}
+
+	at, err := s.generateAccessToken(authorizationCode.Subject, authorizationCode.ClientID)
+	if err != nil {
+		return fiber.ErrInternalServerError
+	}
+
+	return c.JSON(map[string]interface{}{
+		"access_token": at,
 	})
 }
 
@@ -160,7 +207,20 @@ func (s *oauthServer) withAuth(c *fiber.Ctx) error {
 		return fiber.ErrUnauthorized
 	}
 
-	ctx := context.WithValue(context.Background(), contextKey("access_token"), at)
+	ctx := context.WithValue(c.UserContext(), contextKey("access_token"), at)
 	c.SetUserContext(ctx)
 	return c.Next()
+}
+
+func (s *oauthServer) generateAccessToken(subject string, clientID string) (string, error) {
+	at := jwt.NewWithClaims(jwt.SigningMethodHS256, accessToken{
+		RegisteredClaims: jwt.RegisteredClaims{
+			Issuer:    "semaphore",
+			Subject:   subject,
+			Audience:  jwt.ClaimStrings{clientID},
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(OauthAccessTokenExpirationTime)),
+		},
+	})
+
+	return at.SignedString([]byte(v.GetString("app_key")))
 }

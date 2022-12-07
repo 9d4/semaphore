@@ -22,4 +22,5 @@ type AuthorizationCode struct {
 	Code     string  `json:"code"`
 	Scopes   []Scope `json:"scopes"`
 	ClientID string  `json:"client_id"`
+	Subject  string  `json:"subject"`
 }

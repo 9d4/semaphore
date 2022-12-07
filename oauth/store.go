@@ -14,7 +14,8 @@ import (
 
 type AppStore interface {
 	Create(a *App) error
-	GenerateAuthorizationCode(scopes []Scope, clientID string) (*AuthorizationCode, error)
+	GenerateAuthorizationCode(scopes []Scope, clientID string, subject string) (*AuthorizationCode, error)
+	GetAuthorizationCode(code string) (*AuthorizationCode, error)
 }
 
 type appStore struct {
@@ -33,12 +34,12 @@ func (s appStore) Create(a *App) error {
 }
 
 // GenerateAuthorizationCode generates authorization code and save to cache
-func (s appStore) GenerateAuthorizationCode(scopes []Scope, clientID string) (*AuthorizationCode, error) {
+func (s appStore) GenerateAuthorizationCode(scopes []Scope, clientID string, subject string) (*AuthorizationCode, error) {
 	var (
-		generated       = generateAuthCode(scopes, clientID)
+		generated       = generateAuthCode(scopes, clientID, subject)
 		generatedJson   = bytes.NewBuffer([]byte{})
 		cacheKey        = fmt.Sprint(CachePrefixAuthorizationCode, generated.Code)
-		cacheExpiration = time.Duration(time.Minute * 5)
+		cacheExpiration = time.Minute * 5
 	)
 
 	err := json.NewEncoder(generatedJson).Encode(generated)
@@ -56,7 +57,29 @@ func (s appStore) GenerateAuthorizationCode(scopes []Scope, clientID string) (*A
 	return generated, nil
 }
 
-func generateAuthCode(scopes []Scope, clientID string) *AuthorizationCode {
+// GetAuthorizationCode takes marshaled AuthorizationCode from redis cache
+// therefore if key does not found it returns error with type redis.Nil
+func (s appStore) GetAuthorizationCode(code string) (*AuthorizationCode, error) {
+	var (
+		authorizationCode = AuthorizationCode{}
+		key               = fmt.Sprint(CachePrefixAuthorizationCode, code)
+		bgCtx, _          = context.WithDeadline(context.Background(), time.Now().Add(time.Second*5))
+	)
+
+	res := s.rdb.Get(bgCtx, key)
+	if res.Err() != nil {
+		return nil, res.Err()
+	}
+
+	err := json.NewDecoder(bytes.NewBufferString(res.Val())).Decode(&authorizationCode)
+	if err != nil {
+		return nil, err
+	}
+
+	return &authorizationCode, nil
+}
+
+func generateAuthCode(scopes []Scope, clientID string, subject string) *AuthorizationCode {
 	var (
 		randomRanges         = []rune("1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 		randomByteRangeStart = 0
@@ -75,6 +98,7 @@ func generateAuthCode(scopes []Scope, clientID string) *AuthorizationCode {
 	authorizationCode.Code = string(output)
 	authorizationCode.Scopes = scopes
 	authorizationCode.ClientID = clientID
+	authorizationCode.Subject = subject
 
 	return authorizationCode
 }
