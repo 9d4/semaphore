@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"github.com/9d4/semaphore/oauth"
 	"github.com/go-redis/redis/v9"
-	"github.com/google/uuid"
 	jww "github.com/spf13/jwalterweatherman"
+	v "github.com/spf13/viper"
 	"strings"
 
 	"github.com/gofiber/fiber/v2"
@@ -20,22 +20,6 @@ type oauthServer struct {
 	db  *gorm.DB
 	rdb *redis.Client
 }
-
-type oauthScope string
-
-// Scopes
-const (
-	ScopeUserinfoRead oauthScope = "ur"
-)
-
-var oauthScopes = []oauthScope{
-	ScopeUserinfoRead,
-}
-
-const (
-	// RedisOauthClientPrefix should be followed with clientID.
-	RedisOauthClientPrefix = "oauth:client:"
-)
 
 func newOauthServer(db *gorm.DB, rdb *redis.Client) *oauthServer {
 	os := &oauthServer{
@@ -50,6 +34,7 @@ func newOauthServer(db *gorm.DB, rdb *redis.Client) *oauthServer {
 
 func (s *oauthServer) setupRoutes() {
 	s.app.Get("/authorize", s.handleAuthorize)
+	s.app.Post("/authorize", s.withAuth, s.handleAuthorize, s.handleAuthorizePost)
 }
 
 func (s *oauthServer) handleAuthorize(c *fiber.Ctx) error {
@@ -75,7 +60,7 @@ func (s *oauthServer) handleAuthorize(c *fiber.Ctx) error {
 
 	// Get oauth app from cache first then check on database
 	clientApp := &oauth.App{}
-	cacheKey := fmt.Sprint(RedisOauthClientPrefix, queryClientID)
+	cacheKey := fmt.Sprint(oauth.CachePrefixOauthClient, queryClientID)
 	cache := s.rdb.Get(context.Background(), cacheKey)
 	if cache.Err() != nil {
 		tx := s.db.First(clientApp, oauth.App{ClientID: queryClientID})
@@ -97,18 +82,32 @@ func (s *oauthServer) handleAuthorize(c *fiber.Ctx) error {
 	if queryScope == "" {
 		return fiber.ErrNotAcceptable
 	}
-	scopes := strings.Split(queryScope, "\x20")
+
+	var scopes []oauth.Scope
+	for _, s := range strings.Split(queryScope, " ") {
+		scopes = append(scopes, oauth.Scope(s))
+	}
 
 	// if a scopes does neither not found nor malformed nor anything
 	// we don't know, just remove from slice
-	var fixedScopes []oauthScope
+	var fixedScopes []oauth.Scope
 	for _, s := range scopes {
-		for _, definedScope := range oauthScopes {
+		for _, definedScope := range oauth.Scopes {
 			// 		queried scopes available	 AND  no duplicate
-			if oauthScope(s) == definedScope && !slices.Contains(fixedScopes, definedScope) {
+			if oauth.Scope(s) == definedScope && !slices.Contains(fixedScopes, definedScope) {
 				fixedScopes = append(fixedScopes, definedScope)
 			}
 		}
+	}
+
+	// if the method is POST, it means the resource owner has authorized
+	// the authorization. Now generate authorization code and redirect to
+	// redirect_uri value from query.
+	if c.Method() == fiber.MethodPost {
+		scopesCtx := context.WithValue(context.Background(), contextKey("scopes"), fixedScopes)
+		c.SetUserContext(scopesCtx)
+
+		return c.Next()
 	}
 
 	// Tells frontend from which backend part is the redirection.
@@ -118,16 +117,50 @@ func (s *oauthServer) handleAuthorize(c *fiber.Ctx) error {
 	return c.Redirect(authorizationViewRoute, fiber.StatusSeeOther)
 }
 
-type authorizationCode struct {
-	Code     string       `json:"code"`
-	Scopes   []oauthScope `json:"scopes"`
-	ClientID string       `json:"client_id"`
+func (s *oauthServer) handleAuthorizePost(c *fiber.Ctx) error {
+	var (
+		stores = oauth.NewStore(s.db, s.rdb)
+
+		scopes []oauth.Scope
+	)
+
+	scopes, ok := c.UserContext().Value(contextKey("scopes")).([]oauth.Scope)
+	if !ok {
+		return fiber.ErrInternalServerError
+	}
+
+	authorizationCode, err := stores.GenerateAuthorizationCode(scopes, c.Query("client_id"))
+	if err != nil {
+		return fiber.ErrInternalServerError
+	}
+
+	// Send redirect uri to frontend
+	targetUri := fmt.Sprint(c.Query("redirect_uri"), "?code=", authorizationCode.Code)
+
+	if c.SendStatus(fiber.StatusCreated) != nil {
+		return err
+	}
+
+	return c.JSON(map[string]interface{}{
+		"target_uri": targetUri,
+	})
 }
 
-func generateAuthorizationCode(scopes []oauthScope, clientID string) *authorizationCode {
-	ac := &authorizationCode{}
-	ac.Code = uuid.NewString()
-	ac.Scopes = scopes
-	ac.ClientID = clientID
-	return ac
+func (s *oauthServer) withAuth(c *fiber.Ctx) error {
+	authorizationPrefix := "Bearer "
+	authHeader := c.GetReqHeaders()[fiber.HeaderAuthorization]
+
+	if authHeader == "" {
+		return fiber.ErrUnauthorized
+	}
+
+	token := strings.TrimPrefix(authHeader, authorizationPrefix)
+	at, err := validateAccessToken(token, []byte(v.GetString("app_key")))
+	if err != nil {
+		return fiber.ErrUnauthorized
+	}
+
+	ctx := context.WithValue(context.Background(), contextKey("access_token"), at)
+	c.SetUserContext(ctx)
+	return c.Next()
 }
