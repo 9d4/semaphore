@@ -26,10 +26,10 @@ type apiServer struct {
 }
 
 type userInfo struct {
-	ID        uint
-	Email     string
-	FirstName string
-	LastName  string
+	ID        uint   `json:"id,omitempty"`
+	Email     string `json:"email,omitempty"`
+	FirstName string `json:"firstname,omitempty"`
+	LastName  string `json:"lastname,omitempty"`
 }
 
 type accessToken struct {
