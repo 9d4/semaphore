@@ -2,18 +2,18 @@ package server
 
 import "github.com/gofiber/fiber/v2"
 
-type staticServer struct {
+type viewServer struct {
 	app *fiber.App
 }
 
-func (s *staticServer) setupRoutes() {
+func (s *viewServer) setupRoutes() {
 	s.app.Get("/*", func(c *fiber.Ctx) error {
 		return c.SendFile("./views/dist/index.html", true)
 	})
 }
 
-func newStaticServer() *staticServer {
-	s := &staticServer{
+func newViewServer() *viewServer {
+	s := &viewServer{
 		app: fiber.New(),
 	}
 	s.setupRoutes()
