@@ -70,7 +70,11 @@ export default {
       if (query.from === "oauth_authorize") {
         // now throw the user back to oauth
         window.location = `${window.location.origin}/oauth/authorize${window.location.search}`;
+        return;
       }
+
+      // reload on login success
+      window.location.reload();
     },
   },
 };
