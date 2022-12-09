@@ -6,6 +6,11 @@ import (
 	jww "github.com/spf13/jwalterweatherman"
 )
 
+func init() {
+	rootCmd.AddCommand(dbCmd)
+	dbCmd.AddCommand(dbSeedCmd)
+}
+
 var dbCmd = &cobra.Command{
 	Use:   "db",
 	Short: "Database utilities",
@@ -21,8 +26,4 @@ var dbSeedCmd = &cobra.Command{
 		store.Seed(passData.store)
 		jww.INFO.Print("done.")
 	}),
-}
-
-func init() {
-	dbCmd.AddCommand(dbSeedCmd)
 }
