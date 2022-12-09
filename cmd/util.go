@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"context"
-	"crypto/rand"
 	"fmt"
 	"github.com/9d4/semaphore/store"
 	"github.com/go-redis/redis/v9"
@@ -26,11 +25,6 @@ type (
 
 func boot(fn bootFunc) cobraFunc {
 	return func(cmd *cobra.Command, args []string) {
-		if v.GetBool("gen-key") {
-			fmt.Println(generateKey())
-			return
-		}
-
 		// connect db and something else here
 		data := &bootData{}
 
@@ -68,13 +62,4 @@ func boot(fn bootFunc) cobraFunc {
 
 		fn(cmd, args, data)
 	}
-}
-
-func generateKey() string {
-	buff := make([]byte, 32)
-	if _, err := rand.Read(buff); err != nil {
-		jww.FATAL.Fatal(err)
-	}
-
-	return fmt.Sprintf("%x", buff)
 }

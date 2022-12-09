@@ -1,6 +1,9 @@
 package util
 
 import (
+	"crypto/rand"
+	"fmt"
+	jww "github.com/spf13/jwalterweatherman"
 	"unsafe"
 
 	"github.com/matthewhartstonge/argon2"
@@ -33,4 +36,13 @@ func VerifyEncoded(passwd []byte, encoded []byte) bool {
 	}
 
 	return ok
+}
+
+func GenerateKey() string {
+	buff := make([]byte, 32)
+	if _, err := rand.Read(buff); err != nil {
+		jww.FATAL.Fatal(err)
+	}
+
+	return fmt.Sprintf("%x", buff)
 }

@@ -20,22 +20,27 @@ var rootCmd = cobra.Command{
 	}),
 }
 
-var serverFlags = flag.NewFlagSet(rootCmd.Name(), flag.ContinueOnError)
+var (
+	globalFlags = flag.NewFlagSet(rootCmd.Name(), flag.ContinueOnError)
+	serverFlags = flag.NewFlagSet(rootCmd.Name(), flag.ContinueOnError)
+)
 
 func init() {
-	registerCommands()
 	initFlags()
 	cobra.OnInitialize(func() { initConfig(); initLogger() })
 
-	rootCmd.PersistentFlags().AddFlagSet(serverFlags)
-	err := viper.BindPFlags(serverFlags)
+	rootCmd.PersistentFlags().AddFlagSet(globalFlags)
+	rootCmd.Flags().AddFlagSet(serverFlags)
+
+	err := viper.BindPFlags(globalFlags)
 	if err != nil {
 		return
 	}
-}
 
-func registerCommands() {
-	rootCmd.AddCommand(dbCmd)
+	err = viper.BindPFlags(serverFlags)
+	if err != nil {
+		return
+	}
 }
 
 func initConfig() {
@@ -51,12 +56,12 @@ func initConfig() {
 
 func initFlags() {
 	serverFlags.StringP("addr", "a", "0.0.0.0:3500", "Address to listen on")
-	serverFlags.String("dbhost", "127.0.0.1", "Database host")
-	serverFlags.String("dbport", "5432", "Database port")
-	serverFlags.String("dbname", "semaphore", "Database name")
-	serverFlags.String("dbuser", "semaphore", "Database user")
-	serverFlags.String("dbpasswd", "smphr", "Database password")
-	serverFlags.Bool("gen-key", false, "Generate app key and print to screen")
+
+	globalFlags.String("dbhost", "127.0.0.1", "Database host")
+	globalFlags.String("dbport", "5432", "Database port")
+	globalFlags.String("dbname", "semaphore", "Database name")
+	globalFlags.String("dbuser", "semaphore", "Database user")
+	globalFlags.String("dbpasswd", "smphr", "Database password")
 }
 
 func initLogger() {
