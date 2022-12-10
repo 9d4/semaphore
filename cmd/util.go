@@ -13,9 +13,8 @@ import (
 )
 
 type bootData struct {
-	db    *gorm.DB
-	rdb   *redis.Client
-	store store.Store
+	db  *gorm.DB
+	rdb *redis.Client
 }
 
 type (
@@ -53,7 +52,6 @@ func boot(fn bootFunc) cobraFunc {
 
 		// build store
 		data.rdb = rdb
-		data.store = store.NewStore(db, rdb)
 
 		// auto migrate
 		jww.INFO.Print("Auto Migrating...")

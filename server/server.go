@@ -6,7 +6,6 @@ import (
 	"github.com/go-redis/redis/v9"
 	"time"
 
-	"github.com/9d4/semaphore/store"
 	"github.com/9d4/semaphore/user"
 	"github.com/gofiber/fiber/v2"
 	"github.com/spf13/viper"
@@ -14,11 +13,10 @@ import (
 )
 
 type server struct {
-	app   *fiber.App
-	db    *gorm.DB
-	rdb   *redis.Client
-	store store.Store
-	v     *viper.Viper
+	app *fiber.App
+	db  *gorm.DB
+	rdb *redis.Client
+	v   *viper.Viper
 }
 
 func (s *server) setupRoutes() {
@@ -33,7 +31,7 @@ func (s *server) setupRoutes() {
 	oauthSrv := newOauthServer(s.db, s.rdb)
 	s.app.Mount("/oauth", oauthSrv.app)
 
-	apiSrv := newApiServer(s.db, s.store)
+	apiSrv := newApiServer(s.db)
 	s.app.Mount("/api", apiSrv.app)
 
 	// This is kinda tricky. Mounts will be executed lastly.
@@ -83,13 +81,12 @@ func (s *server) handleLogin(c *fiber.Ctx) error {
 	return c.RedirectBack(c.GetReqHeaders()[fiber.HeaderReferer], 302)
 }
 
-func Start(db *gorm.DB, rdb *redis.Client, store store.Store) error {
+func Start(db *gorm.DB, rdb *redis.Client) error {
 	srv := &server{
-		app:   fiber.New(),
-		v:     viper.GetViper(),
-		db:    db,
-		rdb:   rdb,
-		store: store,
+		app: fiber.New(),
+		v:   viper.GetViper(),
+		db:  db,
+		rdb: rdb,
 	}
 
 	srv.setupRoutes()

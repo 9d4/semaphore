@@ -23,7 +23,7 @@ var dbSeedCmd = &cobra.Command{
 	Run: boot(func(cmd *cobra.Command, args []string, passData *bootData) {
 		// seed?
 		jww.INFO.Print("Seeding database...")
-		store.Seed(passData.store)
+		store.Seed(passData.db, passData.rdb)
 		jww.INFO.Print("done.")
 	}),
 }

@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/9d4/semaphore/store"
 	"github.com/9d4/semaphore/user"
 	"github.com/9d4/semaphore/util"
 	"github.com/gofiber/fiber/v2"
@@ -19,10 +18,9 @@ import (
 )
 
 type apiServer struct {
-	app   *fiber.App
-	db    *gorm.DB
-	store store.Store
-	v     *viper.Viper
+	app *fiber.App
+	db  *gorm.DB
+	v   *viper.Viper
 }
 
 type userInfo struct {
@@ -48,12 +46,11 @@ const (
 	RefreshTokenExpirationTime = time.Hour * 48
 )
 
-func newApiServer(db *gorm.DB, store store.Store) *apiServer {
+func newApiServer(db *gorm.DB) *apiServer {
 	srv := &apiServer{
-		app:   fiber.New(),
-		v:     viper.GetViper(),
-		db:    db,
-		store: store,
+		app: fiber.New(),
+		v:   viper.GetViper(),
+		db:  db,
 	}
 
 	srv.setupRoutes()
