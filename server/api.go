@@ -121,7 +121,7 @@ func (s *apiServer) handleRenew(c *fiber.Ctx) error {
 	}
 
 	var usr user.User
-	result := s.db.First(&usr, user.User{Model: gorm.Model{ID: uint(subjectID)}})
+	result := s.db.First(&usr, user.User{ID: uint(subjectID)})
 	if result.Error != nil {
 		return fiber.ErrUnauthorized
 	}
@@ -161,7 +161,7 @@ func (s *apiServer) handleUsersProfile(c *fiber.Ctx) error {
 	}
 
 	var usr user.User
-	result := s.db.First(&usr, user.User{Model: gorm.Model{ID: at.User.ID}})
+	result := s.db.First(&usr, user.User{ID: at.User.ID})
 	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		return errs.WriteErrorJSON(c, errs.ErrCredentialNotFound)
 	}
