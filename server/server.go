@@ -36,8 +36,7 @@ func (s *server) setupRoutes() {
 
 	// This is kinda tricky. Mounts will be executed lastly.
 	// So if nothing found, fallback to index.html.
-	staticSrv := newViewServer()
-	s.app.Mount("/*", staticSrv.app)
+	s.app.Mount("/*", viewApp())
 }
 
 func (s *server) listen() error {
