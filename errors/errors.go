@@ -1,10 +1,10 @@
-package server
+package errors
 
 import (
 	"github.com/gofiber/fiber/v2"
 )
 
-// Represents error during request handling
+// Error represents error during request handling
 type Error struct {
 	Code    int    `json:"code"`
 	ErrorID string `json:"error"`
@@ -24,8 +24,11 @@ func NewError(code int, errorID string, message string) *Error {
 	return err
 }
 
-func writeError(c *fiber.Ctx, err *Error) error {
-	c.SendStatus(err.Code)
+func WriteErrorJSON(c *fiber.Ctx, err *Error) error {
+	er := c.SendStatus(err.Code)
+	if er != nil {
+		return fiber.ErrInternalServerError
+	}
 	return c.JSON(map[string]interface{}{
 		"error":   err.ErrorID,
 		"message": err.Message,

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	errs "github.com/9d4/semaphore/errors"
 	"strconv"
 	"strings"
 	"time"
@@ -11,7 +12,7 @@ import (
 	"github.com/9d4/semaphore/user"
 	"github.com/9d4/semaphore/util"
 	"github.com/gofiber/fiber/v2"
-	jwt "github.com/golang-jwt/jwt/v4"
+	"github.com/golang-jwt/jwt/v4"
 	jww "github.com/spf13/jwalterweatherman"
 	"github.com/spf13/viper"
 	"gorm.io/gorm"
@@ -78,12 +79,12 @@ func (s *apiServer) handleLogin(c *fiber.Ctx) error {
 	var usr user.User
 	result := s.db.First(&usr, user.User{Email: cred.Email})
 	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-		return writeError(c, ErrCredentialNotFound)
+		return errs.WriteErrorJSON(c, errs.ErrCredentialNotFound)
 	}
 
 	match := util.VerifyEncoded([]byte(cred.Password), []byte(usr.Password))
 	if !match {
-		return writeError(c, ErrCredentialNotFound)
+		return errs.WriteErrorJSON(c, errs.ErrCredentialNotFound)
 	}
 
 	// if url contains query "check=1" then don't generate token
@@ -162,7 +163,7 @@ func (s *apiServer) handleUsersProfile(c *fiber.Ctx) error {
 	var usr user.User
 	result := s.db.First(&usr, user.User{Model: gorm.Model{ID: at.User.ID}})
 	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-		return writeError(c, ErrCredentialNotFound)
+		return errs.WriteErrorJSON(c, errs.ErrCredentialNotFound)
 	}
 
 	return c.JSON(usr)

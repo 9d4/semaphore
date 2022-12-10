@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	errs "github.com/9d4/semaphore/errors"
 	"github.com/9d4/semaphore/oauth"
 	"github.com/go-redis/redis/v9"
 	"github.com/golang-jwt/jwt/v4"
@@ -25,7 +26,7 @@ type oauthServer struct {
 }
 
 const (
-	OauthAccessTokenExpirationTime = time.Duration(time.Hour * 24)
+	OauthAccessTokenExpirationTime = time.Hour * 24
 )
 
 func newOauthServer(db *gorm.DB, rdb *redis.Client) *oauthServer {
@@ -74,7 +75,7 @@ func (s *oauthServer) handleAuthorize(c *fiber.Ctx) error {
 		tx := s.db.First(clientApp, oauth.App{ClientID: queryClientID})
 		if tx.Error != nil {
 			if errors.Is(gorm.ErrRecordNotFound, tx.Error) {
-				return writeError(c, ErrOauthClientNotFound)
+				return errs.WriteErrorJSON(c, errs.ErrOauthClientNotFound)
 			}
 			jww.TRACE.Println(tx.Error)
 			return fiber.ErrNotAcceptable
@@ -102,7 +103,7 @@ func (s *oauthServer) handleAuthorize(c *fiber.Ctx) error {
 	for _, s := range scopes {
 		for _, definedScope := range oauth.Scopes {
 			// 		queried scopes available	 AND  no duplicate
-			if oauth.Scope(s) == definedScope && !slices.Contains(fixedScopes, definedScope) {
+			if s == definedScope && !slices.Contains(fixedScopes, definedScope) {
 				fixedScopes = append(fixedScopes, definedScope)
 			}
 		}
