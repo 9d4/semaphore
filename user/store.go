@@ -31,6 +31,9 @@ type Store interface {
 
 	// SetDB sets the underlying *gorm.DB instance.
 	SetDB(db *gorm.DB)
+
+	// Migrate auto-migrates the User model to database.
+	Migrate() error
 }
 
 type store struct {
@@ -102,6 +105,14 @@ func (s *store) DB() *gorm.DB {
 
 func (s *store) SetDB(db *gorm.DB) {
 	s.db = db
+}
+
+func (s *store) Migrate() error {
+	err := s.db.AutoMigrate(&User{})
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (s *store) Create(u *User) error {

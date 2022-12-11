@@ -389,6 +389,18 @@ func Test_store_SetDB(t *testing.T) {
 	}
 }
 
+func Test_store_Migrate(t *testing.T) {
+	db, c := createMemDB(t)
+	defer c()
+
+	s := NewStore(db)
+
+	err := s.Migrate()
+	if err != nil {
+		t.Errorf("Migrate returned an error: %v", err)
+	}
+}
+
 func createMemDB(t testing.TB) (*gorm.DB, func()) {
 	t.Helper()
 
