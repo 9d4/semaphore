@@ -46,7 +46,7 @@ func (s *server) setupRoutes() {
 }
 
 func (s *server) listen() error {
-	return s.app.Listen(s.v.GetString("addr"))
+	return s.app.Listen(s.Address)
 }
 
 func (s *server) handleLogin(c *fiber.Ctx) error {
