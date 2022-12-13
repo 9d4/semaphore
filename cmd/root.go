@@ -1,8 +1,10 @@
 package cmd
 
 import (
+	"github.com/joho/godotenv"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/9d4/semaphore/server"
 	"github.com/spf13/cobra"
@@ -15,53 +17,58 @@ var rootCmd = cobra.Command{
 	Use:   "semaphore",
 	Short: "Start semaphore server.",
 	Long:  "Semaphore is blablabla..........",
-	Run: boot(func(cmd *cobra.Command, args []string, passData *bootData) {
-		log.Fatal(server.Start(passData.db, passData.rdb))
-	}),
+	Run: func(cmd *cobra.Command, args []string) {
+		log.Fatal(server.Start(server.ParseViper(v)))
+	},
 }
 
 var (
+	v           = viper.NewWithOptions(viper.EnvKeyReplacer(strings.NewReplacer("-", "_")))
 	globalFlags = flag.NewFlagSet(rootCmd.Name(), flag.ContinueOnError)
 	serverFlags = flag.NewFlagSet(rootCmd.Name(), flag.ContinueOnError)
 )
 
 func init() {
 	initFlags()
-	cobra.OnInitialize(func() { initConfig(); initLogger() })
+	cobra.OnInitialize(func() { loadEnv(); initConfig(); initLogger() })
 
 	rootCmd.PersistentFlags().AddFlagSet(globalFlags)
 	rootCmd.Flags().AddFlagSet(serverFlags)
 
-	err := viper.BindPFlags(globalFlags)
+	err := v.BindPFlags(globalFlags)
 	if err != nil {
 		return
 	}
 
-	err = viper.BindPFlags(serverFlags)
+	err = v.BindPFlags(serverFlags)
 	if err != nil {
 		return
 	}
 }
 
+func loadEnv() {
+	err := godotenv.Load(".env")
+	if err != nil {
+		jww.FATAL.Fatal("Error loading .env file")
+	}
+}
+
 func initConfig() {
-	viper.AddConfigPath(".")
-	viper.SetConfigName(".env")
-	viper.SetConfigType("env")
-	viper.AutomaticEnv()
-	err := viper.ReadInConfig()
+	v.AutomaticEnv()
+	err := v.ReadInConfig()
 	if err != nil {
 		return
 	}
 }
 
 func initFlags() {
-	serverFlags.StringP("addr", "a", "0.0.0.0:3500", "Address to listen on")
+	serverFlags.StringP("address", "a", "0.0.0.0:3500", "Address to listen on")
 
-	globalFlags.String("dbhost", "127.0.0.1", "Database host")
-	globalFlags.String("dbport", "5432", "Database port")
-	globalFlags.String("dbname", "semaphore", "Database name")
-	globalFlags.String("dbuser", "semaphore", "Database user")
-	globalFlags.String("dbpasswd", "smphr", "Database password")
+	globalFlags.String("db-host", "127.0.0.1", "Database host")
+	globalFlags.String("db-port", "5432", "Database port")
+	globalFlags.String("db-name", "semaphore", "Database name")
+	globalFlags.String("db-username", "semaphore", "Database user")
+	globalFlags.String("db-password", "smphr", "Database password")
 }
 
 func initLogger() {

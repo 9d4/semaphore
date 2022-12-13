@@ -7,7 +7,6 @@ import (
 	"github.com/go-redis/redis/v9"
 	"github.com/spf13/cobra"
 	jww "github.com/spf13/jwalterweatherman"
-	v "github.com/spf13/viper"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -28,11 +27,11 @@ func boot(fn bootFunc) cobraFunc {
 		data := &bootData{}
 
 		dsn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
-			v.GetString("dbhost"),
-			v.GetInt("dbport"),
-			v.GetString("dbuser"),
-			v.GetString("dbpasswd"),
-			v.GetString("dbname"),
+			v.GetString("db-host"),
+			v.GetInt("db-port"),
+			v.GetString("db-user"),
+			v.GetString("db-passwd"),
+			v.GetString("db-name"),
 		)
 		db, err := gorm.Open(postgres.Open(dsn))
 		if err != nil {

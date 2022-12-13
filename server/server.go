@@ -2,9 +2,13 @@ package server
 
 import (
 	"errors"
+	"fmt"
 	errs "github.com/9d4/semaphore/errors"
 	"github.com/9d4/semaphore/util"
 	"github.com/go-redis/redis/v9"
+	jww "github.com/spf13/jwalterweatherman"
+	"gorm.io/driver/postgres"
+	"sort"
 	"time"
 
 	"github.com/9d4/semaphore/user"
@@ -14,6 +18,7 @@ import (
 )
 
 type server struct {
+	*Config
 	app *fiber.App
 	db  *gorm.DB
 	rdb *redis.Client
@@ -81,12 +86,51 @@ func (s *server) handleLogin(c *fiber.Ctx) error {
 	return c.RedirectBack(c.GetReqHeaders()[fiber.HeaderReferer], 302)
 }
 
-func Start(db *gorm.DB, rdb *redis.Client) error {
+func Start(opts ...Option) error {
+	config := &Config{}
+
+	if len(opts) < 1 {
+		config = &(*defaultConfig)
+	}
+
+	sort.Slice(opts, func(i, j int) bool {
+		_, isConfig := opts[i].(*Config)
+		_, isConfig2 := opts[j].(*Config)
+		return isConfig && !isConfig2
+	})
+
+	for _, opt := range opts {
+		if opt != nil {
+			if applyErr := opt.Apply(config); applyErr != nil {
+				return applyErr
+			}
+		}
+	}
+
+	dsn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
+		config.DBHost,
+		config.DBPort,
+		config.DBUsername,
+		config.DBPassword,
+		config.DBName,
+	)
+	db, err := gorm.Open(postgres.Open(dsn))
+	if err != nil {
+		jww.FATAL.Fatal(err)
+	}
+
+	rdb := redis.NewClient(&redis.Options{
+		Addr:     config.RedisAddress,
+		Username: config.RedisUsername,
+		Password: config.RedisPassword,
+	})
+
 	srv := &server{
-		app: fiber.New(),
-		v:   viper.GetViper(),
-		db:  db,
-		rdb: rdb,
+		Config: config,
+		app:    fiber.New(),
+		v:      config.v,
+		db:     db,
+		rdb:    rdb,
 	}
 
 	srv.setupRoutes()
