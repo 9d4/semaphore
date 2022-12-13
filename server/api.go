@@ -3,8 +3,9 @@ package server
 import (
 	"context"
 	"errors"
-	"fmt"
+	"github.com/9d4/semaphore/auth"
 	errs "github.com/9d4/semaphore/errors"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -13,12 +14,12 @@ import (
 	"github.com/9d4/semaphore/util"
 	"github.com/gofiber/fiber/v2"
 	"github.com/golang-jwt/jwt/v4"
-	jww "github.com/spf13/jwalterweatherman"
 	"github.com/spf13/viper"
 	"gorm.io/gorm"
 )
 
 type apiServer struct {
+	*Config
 	app *fiber.App
 	db  *gorm.DB
 	v   *viper.Viper
@@ -42,16 +43,30 @@ type refreshToken struct {
 
 type contextKey string
 
-const (
-	AccessTokenExpirationTime  = time.Minute * 15
-	RefreshTokenExpirationTime = time.Hour * 48
-)
+func newApiServer(db *gorm.DB, opts ...Option) *apiServer {
+	config := &Config{}
 
-func newApiServer(db *gorm.DB) *apiServer {
+	if len(opts) < 1 {
+		config = &(*defaultConfig)
+	}
+
+	sort.Slice(opts, func(i, j int) bool {
+		_, isConfig := opts[i].(*Config)
+		_, isConfig2 := opts[j].(*Config)
+		return isConfig && !isConfig2
+	})
+
+	for _, opt := range opts {
+		if opt != nil {
+			opt.Apply(config)
+		}
+	}
+
 	srv := &apiServer{
-		app: fiber.New(),
-		v:   viper.GetViper(),
-		db:  db,
+		Config: config,
+		app:    fiber.New(),
+		v:      viper.GetViper(),
+		db:     db,
 	}
 
 	srv.setupRoutes()
@@ -110,7 +125,7 @@ func (s *apiServer) handleRenew(c *fiber.Ctx) error {
 
 	var rt refreshToken
 
-	token, err := jwt.ParseWithClaims(rtRaw, &rt, jwtKeyFunc([]byte(s.v.GetString("app_key"))))
+	token, err := jwt.ParseWithClaims(rtRaw, &rt, auth.DefaultJwtKeyFunc(s.KeyBytes))
 	if err != nil || !token.Valid {
 		return fiber.ErrUnauthorized
 	}
@@ -136,7 +151,7 @@ func (s *apiServer) handleRenew(c *fiber.Ctx) error {
 		Name:     "rt",
 		Value:    tokenPair["refresh_token"],
 		Domain:   s.v.GetString("cookie_domain"),
-		Expires:  time.Now().Add(RefreshTokenExpirationTime),
+		Expires:  time.Now().Add(auth.RefreshTokenExpiration),
 		HTTPOnly: true,
 	})
 
@@ -178,7 +193,7 @@ func (s *apiServer) withAuth(c *fiber.Ctx) error {
 	}
 
 	token := strings.TrimPrefix(authHeader, authorizationPrefix)
-	at, err := validateAccessToken(token, []byte(s.v.GetString("app_key")))
+	at, err := auth.ValidateAccessToken(token, auth.DefaultJwtKeyFunc(s.KeyBytes))
 	if err != nil {
 		return fiber.ErrUnauthorized
 	}
@@ -189,17 +204,8 @@ func (s *apiServer) withAuth(c *fiber.Ctx) error {
 }
 
 func (s *apiServer) generateTokenPair(usr user.User) (map[string]string, error) {
-	key := []byte(s.v.GetString("app_key"))
-
-	at, err := generateAccessToken(usr, key, AccessTokenExpirationTime)
+	at, rt, err := auth.GenerateTokenPair(usr, s.KeyBytes)
 	if err != nil {
-		jww.TRACE.Println("apiServer:error:generateAccessToken", err)
-		return nil, err
-	}
-
-	rt, err := generateRefreshToken(usr, key, RefreshTokenExpirationTime)
-	if err != nil {
-		jww.TRACE.Println("apiServer:error:generateAccessToken", err)
 		return nil, err
 	}
 
@@ -209,55 +215,11 @@ func (s *apiServer) generateTokenPair(usr user.User) (map[string]string, error) 
 	}, nil
 }
 
-func generateAccessToken(usr user.User, key []byte, expiresIn time.Duration) (string, error) {
-	at := jwt.NewWithClaims(jwt.SigningMethodHS256, accessToken{
-		RegisteredClaims: jwt.RegisteredClaims{
-			Issuer:    "semaphore",
-			IssuedAt:  jwt.NewNumericDate(time.Now()),
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(expiresIn)),
-		},
-		User: userInfo{
-			ID:        usr.ID,
-			Email:     usr.Email,
-			FirstName: usr.FirstName,
-			LastName:  usr.LastName,
-		},
-	})
-
-	return at.SignedString(key)
-}
-
-func generateRefreshToken(usr user.User, key []byte, expiresIn time.Duration) (string, error) {
-	claims := jwt.RegisteredClaims{}
-	claims.Subject = fmt.Sprint(usr.ID)
-	claims.ExpiresAt = jwt.NewNumericDate(time.Now().Add(expiresIn))
-
-	rt := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-
-	return rt.SignedString(key)
-}
-
-func jwtKeyFunc(key []byte) jwt.Keyfunc {
-	return func(t *jwt.Token) (interface{}, error) {
-		return key, nil
-	}
-}
-
+// Deprecated: use auth.ValidateAccessToken
 func validateAccessToken(token string, key []byte) (*accessToken, error) {
 	claims := accessToken{}
 
-	tk, err := jwt.ParseWithClaims(token, &claims, jwtKeyFunc(key))
-	if err != nil || !tk.Valid {
-		return nil, err
-	}
-
-	return &claims, nil
-}
-
-func validateRefreshToken(token string, key []byte) (*refreshToken, error) {
-	claims := refreshToken{}
-
-	tk, err := jwt.ParseWithClaims(token, &claims, jwtKeyFunc(key))
+	tk, err := jwt.ParseWithClaims(token, &claims, auth.DefaultJwtKeyFunc(key))
 	if err != nil || !tk.Valid {
 		return nil, err
 	}

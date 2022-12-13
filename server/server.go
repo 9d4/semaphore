@@ -3,6 +3,7 @@ package server
 import (
 	"errors"
 	"fmt"
+	"github.com/9d4/semaphore/auth"
 	errs "github.com/9d4/semaphore/errors"
 	"github.com/9d4/semaphore/util"
 	"github.com/go-redis/redis/v9"
@@ -37,7 +38,7 @@ func (s *server) setupRoutes() {
 	oauthSrv := newOauthServer(s.db, s.rdb)
 	s.app.Mount("/oauth", oauthSrv.app)
 
-	apiSrv := newApiServer(s.db)
+	apiSrv := newApiServer(s.db, s.Config)
 	s.app.Mount("/api", apiSrv.app)
 
 	// This is kinda tricky. Mounts will be executed lastly.
@@ -70,7 +71,7 @@ func (s *server) handleLogin(c *fiber.Ctx) error {
 		return errs.WriteErrorJSON(c, errs.ErrCredentialNotFound)
 	}
 
-	rt, err := generateRefreshToken(usr, []byte(s.v.GetString("app_key")), RefreshTokenExpirationTime)
+	rt, err := auth.GenerateRefreshToken(usr, s.KeyBytes, auth.RefreshTokenExpiration)
 	if err != nil {
 		return err
 	}
@@ -79,7 +80,7 @@ func (s *server) handleLogin(c *fiber.Ctx) error {
 		Name:     "rt",
 		Value:    rt,
 		Domain:   s.v.GetString("cookie_domain"),
-		Expires:  time.Now().Add(RefreshTokenExpirationTime),
+		Expires:  time.Now().Add(auth.RefreshTokenExpiration),
 		HTTPOnly: true,
 	})
 
