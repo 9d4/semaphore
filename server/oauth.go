@@ -10,9 +10,7 @@ import (
 	"github.com/9d4/semaphore/server/middleware"
 	"github.com/9d4/semaphore/server/types"
 	"github.com/go-redis/redis/v9"
-	"github.com/golang-jwt/jwt/v4"
 	jww "github.com/spf13/jwalterweatherman"
-	v "github.com/spf13/viper"
 	"strconv"
 	"strings"
 	"time"
@@ -187,7 +185,7 @@ func (s *oauthServer) handleExchangeToken(c *fiber.Ctx) error {
 		return fiber.ErrInternalServerError
 	}
 
-	at, err := s.generateAccessToken(authorizationCode.Subject, authorizationCode.ClientID)
+	at, err := oauth.GenerateAccessToken(s.KeyBytes, OauthAccessTokenExpirationTime, authorizationCode.Subject, authorizationCode.ClientID)
 	if err != nil {
 		return fiber.ErrInternalServerError
 	}
@@ -214,17 +212,4 @@ func (s *oauthServer) withBearerAuth(c *fiber.Ctx) error {
 	ctx := context.WithValue(c.UserContext(), types.ContextKey("access_token"), at)
 	c.SetUserContext(ctx)
 	return c.Next()
-}
-
-func (s *oauthServer) generateAccessToken(subject string, clientID string) (string, error) {
-	at := jwt.NewWithClaims(jwt.SigningMethodHS256, accessToken{
-		RegisteredClaims: jwt.RegisteredClaims{
-			Issuer:    "semaphore",
-			Subject:   subject,
-			Audience:  jwt.ClaimStrings{clientID},
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(OauthAccessTokenExpirationTime)),
-		},
-	})
-
-	return at.SignedString([]byte(v.GetString("app_key")))
 }

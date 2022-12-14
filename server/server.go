@@ -41,6 +41,9 @@ func (s *server) setupRoutes() {
 	oauthSrv := newOauthServer(s.db, s.rdb, s.Config)
 	s.app.Mount("/oauth", oauthSrv.app)
 
+	oauthResourceServer := newOAuthResourceServer(s.db, s.Config)
+	s.app.Mount("/api/oauth", oauthResourceServer.App)
+
 	apiSrv := newApiServer(s.db, s.Config)
 	s.app.Mount("/api", apiSrv.app)
 

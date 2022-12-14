@@ -1,7 +1,6 @@
 package oauth
 
 import (
-	"github.com/9d4/semaphore/user"
 	"github.com/golang-jwt/jwt/v4"
 	"time"
 )
@@ -35,28 +34,16 @@ type AuthorizationCode struct {
 
 type AccessToken struct {
 	jwt.RegisteredClaims
-	User UserInfo `json:"user"`
 }
 
-type UserInfo struct {
-	ID        uint   `json:"id"`
-	Email     string `json:"email"`
-	FirstName string `json:"firstname"`
-	LastName  string `json:"lastname"`
-}
-
-func GenerateAccessToken(usr user.User, key []byte, expiresIn time.Duration) (string, error) {
+func GenerateAccessToken(key []byte, expiresIn time.Duration, subject string, clientID ...string) (string, error) {
 	at := jwt.NewWithClaims(jwt.SigningMethodHS256, AccessToken{
 		RegisteredClaims: jwt.RegisteredClaims{
+			Subject:   subject,
 			Issuer:    AccessTokenIssuer,
+			Audience:  clientID,
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(expiresIn)),
-		},
-		User: UserInfo{
-			ID:        usr.ID,
-			Email:     usr.Email,
-			FirstName: usr.FirstName,
-			LastName:  usr.LastName,
 		},
 	})
 
