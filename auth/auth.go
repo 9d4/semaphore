@@ -23,10 +23,10 @@ type RefreshToken struct {
 
 // UserInfo represents user info that will be part of AccessToken.
 type UserInfo struct {
-	ID        uint   `json:"id,omitempty"`
-	Email     string `json:"email,omitempty"`
-	FirstName string `json:"firstname,omitempty"`
-	LastName  string `json:"lastname,omitempty"`
+	ID        uint   `json:"id"`
+	Email     string `json:"email"`
+	FirstName string `json:"firstname"`
+	LastName  string `json:"lastname"`
 }
 
 const (
