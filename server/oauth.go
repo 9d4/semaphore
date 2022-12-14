@@ -4,8 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/9d4/semaphore/auth"
 	errs "github.com/9d4/semaphore/errors"
 	"github.com/9d4/semaphore/oauth"
+	"github.com/9d4/semaphore/server/middleware"
+	"github.com/9d4/semaphore/server/types"
 	"github.com/go-redis/redis/v9"
 	"github.com/golang-jwt/jwt/v4"
 	jww "github.com/spf13/jwalterweatherman"
@@ -20,6 +23,7 @@ import (
 )
 
 type oauthServer struct {
+	*Config
 	app *fiber.App
 	db  *gorm.DB
 	rdb *redis.Client
@@ -29,11 +33,12 @@ const (
 	OauthAccessTokenExpirationTime = time.Hour * 24
 )
 
-func newOauthServer(db *gorm.DB, rdb *redis.Client) *oauthServer {
+func newOauthServer(db *gorm.DB, rdb *redis.Client, config *Config) *oauthServer {
 	os := &oauthServer{
-		app: fiber.New(),
-		db:  db,
-		rdb: rdb,
+		Config: config,
+		app:    fiber.New(),
+		db:     db,
+		rdb:    rdb,
 	}
 	os.setupRoutes()
 
@@ -41,8 +46,10 @@ func newOauthServer(db *gorm.DB, rdb *redis.Client) *oauthServer {
 }
 
 func (s *oauthServer) setupRoutes() {
+	bearerAuth := middleware.BearerAuth(s.KeyBytes)
+
 	s.app.Get("/authorize", s.handleAuthorize)
-	s.app.Post("/authorize", s.withAuth, s.handleAuthorize, s.handleAuthorizePost)
+	s.app.Post("/authorize", bearerAuth, s.handleAuthorize, s.handleAuthorizePost)
 	s.app.Post("/token", s.handleExchangeToken)
 }
 
@@ -82,7 +89,7 @@ func (s *oauthServer) handleAuthorize(c *fiber.Ctx) error {
 		}
 
 		// save to cache
-		status := s.rdb.Set(context.Background(), cacheKey, clientApp.ID, redis.KeepTTL)
+		status := s.rdb.Set(c.UserContext(), cacheKey, clientApp.ID, redis.KeepTTL)
 		jww.DEBUG.Println(status.Err())
 		jww.DEBUG.Println("save client to cache", cacheKey)
 	}
@@ -113,10 +120,7 @@ func (s *oauthServer) handleAuthorize(c *fiber.Ctx) error {
 	// the authorization. Now generate authorization code and redirect to
 	// redirect_uri value from query.
 	if c.Method() == fiber.MethodPost {
-		scopesCtx := context.WithValue(c.UserContext(), contextKey("scopes"), fixedScopes)
-		c.SetUserContext(scopesCtx)
-
-		scopesCtx = context.WithValue(c.UserContext(), contextKey("scopess"), fixedScopes)
+		scopesCtx := context.WithValue(c.UserContext(), types.ContextKey("scopes"), fixedScopes)
 		c.SetUserContext(scopesCtx)
 
 		return c.Next()
@@ -136,13 +140,12 @@ func (s *oauthServer) handleAuthorizePost(c *fiber.Ctx) error {
 		scopes []oauth.Scope
 	)
 
-	c.UserContext()
-	scopes, ok := c.UserContext().Value(contextKey("scopess")).([]oauth.Scope)
+	scopes, ok := c.UserContext().Value(types.ContextKey("scopes")).([]oauth.Scope)
 	if !ok {
 		return fiber.ErrInternalServerError
 	}
 
-	at, ok := c.UserContext().Value(contextKey("access_token")).(*accessToken)
+	at, ok := c.UserContext().Value(types.ContextKey("access_token")).(*auth.AccessToken)
 	if !ok {
 		return fiber.ErrInternalServerError
 	}
@@ -194,7 +197,7 @@ func (s *oauthServer) handleExchangeToken(c *fiber.Ctx) error {
 	})
 }
 
-func (s *oauthServer) withAuth(c *fiber.Ctx) error {
+func (s *oauthServer) withBearerAuth(c *fiber.Ctx) error {
 	authorizationPrefix := "Bearer "
 	authHeader := c.GetReqHeaders()[fiber.HeaderAuthorization]
 
@@ -203,12 +206,12 @@ func (s *oauthServer) withAuth(c *fiber.Ctx) error {
 	}
 
 	token := strings.TrimPrefix(authHeader, authorizationPrefix)
-	at, err := validateAccessToken(token, []byte(v.GetString("app_key")))
+	at, err := auth.ValidateAccessToken(token, auth.DefaultJwtKeyFunc(s.KeyBytes))
 	if err != nil {
 		return fiber.ErrUnauthorized
 	}
 
-	ctx := context.WithValue(c.UserContext(), contextKey("access_token"), at)
+	ctx := context.WithValue(c.UserContext(), types.ContextKey("access_token"), at)
 	c.SetUserContext(ctx)
 	return c.Next()
 }

@@ -5,11 +5,13 @@ import (
 	"errors"
 	"github.com/9d4/semaphore/auth"
 	errs "github.com/9d4/semaphore/errors"
+	"github.com/9d4/semaphore/server/middleware"
+	"github.com/9d4/semaphore/server/types"
 	"sort"
 	"strconv"
-	"strings"
 	"time"
 
+	serverutil "github.com/9d4/semaphore/server/util"
 	"github.com/9d4/semaphore/user"
 	"github.com/9d4/semaphore/util"
 	"github.com/gofiber/fiber/v2"
@@ -40,8 +42,6 @@ type accessToken struct {
 type refreshToken struct {
 	jwt.RegisteredClaims
 }
-
-type contextKey string
 
 func newApiServer(db *gorm.DB, opts ...Option) *apiServer {
 	config := &Config{}
@@ -74,10 +74,12 @@ func newApiServer(db *gorm.DB, opts ...Option) *apiServer {
 }
 
 func (s *apiServer) setupRoutes() {
+	bearerAuth := middleware.BearerAuth(s.KeyBytes)
+
 	s.app.Post("/login", s.handleLogin)
 	s.app.Post("/renew", s.handleRenew)
 	users := s.app.Group("users/")
-	users.Get(":userid/profile", s.withAuth, s.handleUsersProfile)
+	users.Get(":userid/profile", bearerAuth, s.handleUsersProfile)
 }
 
 func (s *apiServer) handleLogin(c *fiber.Ctx) error {
@@ -165,8 +167,8 @@ func (s *apiServer) handleUsersProfile(c *fiber.Ctx) error {
 		return fiber.ErrBadRequest
 	}
 
-	at := new(accessToken)
-	at, ok := c.UserContext().Value(contextKey("access_token")).(*accessToken)
+	at := &auth.AccessToken{}
+	at, ok := c.UserContext().Value(types.ContextKey("access_token")).(*auth.AccessToken)
 	if !ok {
 		return fiber.ErrInternalServerError
 	}
@@ -184,21 +186,18 @@ func (s *apiServer) handleUsersProfile(c *fiber.Ctx) error {
 	return c.JSON(usr)
 }
 
-func (s *apiServer) withAuth(c *fiber.Ctx) error {
-	authorizationPrefix := "Bearer "
-	authHeader := c.GetReqHeaders()[fiber.HeaderAuthorization]
-
-	if authHeader == "" {
-		return fiber.ErrUnauthorized
+func (s *apiServer) bearerAuth(c *fiber.Ctx) error {
+	token, err := serverutil.GetBearerToken(c)
+	if err != nil {
+		return fiber.ErrInternalServerError
 	}
 
-	token := strings.TrimPrefix(authHeader, authorizationPrefix)
 	at, err := auth.ValidateAccessToken(token, auth.DefaultJwtKeyFunc(s.KeyBytes))
 	if err != nil {
 		return fiber.ErrUnauthorized
 	}
 
-	ctx := context.WithValue(context.Background(), contextKey("access_token"), at)
+	ctx := context.WithValue(context.Background(), types.ContextKey("access_token"), at)
 	c.SetUserContext(ctx)
 	return c.Next()
 }
@@ -213,16 +212,4 @@ func (s *apiServer) generateTokenPair(usr user.User) (map[string]string, error) 
 		"access_token":  at,
 		"refresh_token": rt,
 	}, nil
-}
-
-// Deprecated: use auth.ValidateAccessToken
-func validateAccessToken(token string, key []byte) (*accessToken, error) {
-	claims := accessToken{}
-
-	tk, err := jwt.ParseWithClaims(token, &claims, auth.DefaultJwtKeyFunc(key))
-	if err != nil || !tk.Valid {
-		return nil, err
-	}
-
-	return &claims, nil
 }

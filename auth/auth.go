@@ -34,6 +34,8 @@ const (
 	RefreshTokenExpiration = time.Hour * 48
 )
 
+const AccessTokenIssuer = "semaphore"
+
 var DefaultJwtKeyFunc = func(key []byte) jwt.Keyfunc {
 	return func(token *jwt.Token) (interface{}, error) {
 		return key, nil
@@ -97,6 +99,11 @@ func ValidateAccessToken(token string, keyFunc jwt.Keyfunc) (*AccessToken, error
 		return nil, err
 	}
 
+	// check if claims is created from oauth, not from  normal api
+	if claims.Issuer != AccessTokenIssuer {
+		return nil, jwt.ErrTokenInvalidClaims
+	}
+
 	return &claims, nil
 }
 
@@ -106,6 +113,11 @@ func ValidateRefreshToken(token string, keyFunc jwt.Keyfunc) (*RefreshToken, err
 	tk, err := jwt.ParseWithClaims(token, &claims, keyFunc)
 	if err != nil || !tk.Valid {
 		return nil, err
+	}
+
+	// check if claims is created from normal auth, not from oauth
+	if claims.Issuer != AccessTokenIssuer {
+		return nil, jwt.ErrTokenInvalidClaims
 	}
 
 	return &claims, nil
