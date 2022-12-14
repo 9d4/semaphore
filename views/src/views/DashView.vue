@@ -74,7 +74,7 @@ export default {
         case "":
           this.view = "GreetingTron";
           this.currentViewProps = {
-            name: this.authStore.jwt.User.FirstName,
+            name: this.authStore.jwt.user.firstname,
           };
           break;
         case "profile":

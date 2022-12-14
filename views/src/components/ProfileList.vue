@@ -12,7 +12,7 @@
           type="text"
           class="input input-bordered input-sm w-full"
           disabled="!ro"
-          :value="claims.User.Email"
+          :value="claims.user.email"
         />
       </div>
       <div class="form-control w-full mb-6">
@@ -23,7 +23,7 @@
           type="text"
           class="input input-bordered input-sm w-full"
           disabled="!ro"
-          :value="claims.User.FirstName"
+          :value="claims.user.firstname"
         />
       </div>
       <div class="form-control w-full mb-6">
@@ -34,7 +34,7 @@
           type="text"
           class="input input-bordered input-sm w-full"
           disabled="!ro"
-          :value="claims.User.LastName"
+          :value="claims.user.lastname"
         />
       </div>
     </form>
