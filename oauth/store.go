@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/go-redis/redis/v9"
+	"github.com/gofrs/uuid"
 	jww "github.com/spf13/jwalterweatherman"
 	"gorm.io/gorm"
 	"math/rand"
@@ -13,7 +14,8 @@ import (
 )
 
 type AppStore interface {
-	Create(a *App) error
+	Create(app *App) (*App, error)
+	CreateAuto(name string) (*App, error)
 	GenerateAuthorizationCode(scopes []Scope, clientID string, subject string) (*AuthorizationCode, error)
 	GetAuthorizationCode(code string) (*AuthorizationCode, error)
 }
@@ -27,10 +29,33 @@ func NewStore(db *gorm.DB, rdb *redis.Client) AppStore {
 	return &appStore{db: db, rdb: rdb}
 }
 
-func (s appStore) Create(a *App) error {
-	tx := s.db.Create(a)
+func (s appStore) Create(app *App) (*App, error) {
+	tx := s.db.Create(app)
+	if tx.Error != nil {
+		return nil, tx.Error
+	}
 
-	return tx.Error
+	var _app App
+	tx = s.db.Find(&_app, app)
+	if tx.Error != nil {
+		return nil, tx.Error
+	}
+
+	return &_app, nil
+}
+
+func (s appStore) CreateAuto(name string) (*App, error) {
+	clientID, err := uuid.NewV4()
+	if err != nil {
+		return nil, err
+	}
+
+	app := App{
+		Name:     name,
+		ClientID: clientID.String(),
+	}
+
+	return s.Create(&app)
 }
 
 // GenerateAuthorizationCode generates authorization code and save to cache

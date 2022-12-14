@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"github.com/9d4/semaphore/server"
 	"github.com/9d4/semaphore/store"
 	"github.com/go-redis/redis/v9"
 	"github.com/spf13/cobra"
@@ -12,8 +13,9 @@ import (
 )
 
 type bootData struct {
-	db  *gorm.DB
-	rdb *redis.Client
+	db     *gorm.DB
+	rdb    *redis.Client
+	config *server.Config
 }
 
 type (
@@ -23,26 +25,27 @@ type (
 
 func boot(fn bootFunc) cobraFunc {
 	return func(cmd *cobra.Command, args []string) {
+		config := server.ParseViper(v)
+
 		// connect db and something else here
 		data := &bootData{}
 
 		dsn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
-			v.GetString("db-host"),
-			v.GetInt("db-port"),
-			v.GetString("db-user"),
-			v.GetString("db-passwd"),
-			v.GetString("db-name"),
+			config.DBHost,
+			config.DBPort,
+			config.DBUsername,
+			config.DBPassword,
+			config.DBName,
 		)
 		db, err := gorm.Open(postgres.Open(dsn))
 		if err != nil {
 			jww.FATAL.Fatal(err)
 		}
-		data.db = db
 
 		rdb := redis.NewClient(&redis.Options{
-			Addr:     v.GetString("REDIS_ADDR"),
-			Username: v.GetString("REDIS_USERNAME"),
-			Password: v.GetString("REDIS_PASSWORD"),
+			Addr:     config.RedisAddress,
+			Username: config.RedisUsername,
+			Password: config.RedisPassword,
 		})
 
 		if err = rdb.Ping(context.Background()).Err(); err != nil {
@@ -50,6 +53,7 @@ func boot(fn bootFunc) cobraFunc {
 		}
 
 		// build store
+		data.db = db
 		data.rdb = rdb
 
 		// auto migrate
