@@ -32,7 +32,7 @@ func (s *server) setupRoutes() {
 		Browse:   false,
 	})
 
-	authRouter := s.app.Group("/authRouter")
+	authRouter := s.app.Group("/auth")
 	authRouter.Post("/login", s.handleLogin)
 
 	oauthSrv := newOauthServer(s.db, s.rdb)
