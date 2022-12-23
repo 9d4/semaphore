@@ -37,8 +37,6 @@
 </template>
 
 <script>
-import { useAuthStore } from "@/stores/auth";
-
 export default {
   name: "AuthorizeView",
   data: () => ({
@@ -53,23 +51,17 @@ export default {
       this.$router.push({ name: "dashboard" });
     },
     handleAuthorize: async function () {
-      const authStore = useAuthStore();
-      let authorizeAuth = "/oauth/authorize" + window.location.search;
-      const res = await fetch(authorizeAuth, {
-        method: "POST",
-        headers: {
-          authorization: "Bearer " + authStore.accessToken,
-        },
-      });
+      // const authStore = useAuthStore();
+      let authorizeAuth =
+        "/oauth2/authorize" + window.location.search + "&consent=1";
 
-      if (res.status !== 201) {
-        this.error = res.text();
-      }
+      const formAuth = document.createElement("form");
+      formAuth.setAttribute("action", authorizeAuth);
+      formAuth.setAttribute("method", "POST");
+      formAuth.hidden = true;
 
-      const body = await res.json();
-      if (body["target_uri"]) {
-        window.location = body["target_uri"];
-      }
+      document.querySelector("body").append(formAuth);
+      formAuth.submit();
     },
   },
 };

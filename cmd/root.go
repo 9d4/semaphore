@@ -1,16 +1,15 @@
 package cmd
 
 import (
-	"github.com/joho/godotenv"
-	"log"
-	"os"
-	"strings"
-
 	"github.com/9d4/semaphore/server"
+	"github.com/joho/godotenv"
 	"github.com/spf13/cobra"
 	jww "github.com/spf13/jwalterweatherman"
 	flag "github.com/spf13/pflag"
 	"github.com/spf13/viper"
+	"log"
+	"os"
+	"strings"
 )
 
 var rootCmd = cobra.Command{
@@ -18,7 +17,18 @@ var rootCmd = cobra.Command{
 	Short: "Start semaphore server.",
 	Long:  "Semaphore is blablabla..........",
 	Run: func(cmd *cobra.Command, args []string) {
-		log.Fatal(server.Start(server.ParseViper(v)))
+		srvErr, oauthSrvErr := server.Start(server.ParseViper(v))
+		log.Fatal(<-oauthSrvErr)
+		for {
+			select {
+			case err := <-oauthSrvErr:
+				jww.FATAL.Fatal(err)
+			case err := <-srvErr:
+				jww.FATAL.Fatal(err)
+			default:
+
+			}
+		}
 	},
 }
 

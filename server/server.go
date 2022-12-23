@@ -3,6 +3,11 @@ package server
 import (
 	"errors"
 	"fmt"
+	"log"
+	"os"
+	"sort"
+	"time"
+
 	"github.com/9d4/semaphore/auth"
 	errs "github.com/9d4/semaphore/errors"
 	"github.com/9d4/semaphore/util"
@@ -10,10 +15,6 @@ import (
 	jww "github.com/spf13/jwalterweatherman"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm/logger"
-	"log"
-	"os"
-	"sort"
-	"time"
 
 	"github.com/9d4/semaphore/user"
 	"github.com/gofiber/fiber/v2"
@@ -37,9 +38,6 @@ func (s *server) setupRoutes() {
 
 	authRouter := s.app.Group("/auth")
 	authRouter.Post("/login", s.handleLogin)
-
-	oauthSrv := newOauthServer(s.db, s.rdb, s.Config)
-	s.app.Mount("/oauth", oauthSrv.app)
 
 	oauthResourceServer := newOAuthResourceServer(s.db, s.Config)
 	s.app.Mount("/api/oauth", oauthResourceServer.App)
@@ -93,7 +91,7 @@ func (s *server) handleLogin(c *fiber.Ctx) error {
 	return c.RedirectBack(c.GetReqHeaders()[fiber.HeaderReferer], 302)
 }
 
-func Start(opts ...Option) error {
+func Start(opts ...Option) (srvErr <-chan error, oauthSrvErr <-chan error) {
 	config := &Config{}
 
 	if len(opts) < 1 {
@@ -109,7 +107,7 @@ func Start(opts ...Option) error {
 	for _, opt := range opts {
 		if opt != nil {
 			if applyErr := opt.Apply(config); applyErr != nil {
-				return applyErr
+				jww.FATAL.Fatal(applyErr)
 			}
 		}
 	}
@@ -154,7 +152,18 @@ func Start(opts ...Option) error {
 		db:     db,
 		rdb:    rdb,
 	}
-
 	srv.setupRoutes()
-	return srv.listen()
+
+	oauthSrv := newOauthServer(db, rdb, config)
+
+	_srvErr := make(chan error, 1)
+	srvErr = _srvErr
+
+	_oauthSrvErr := make(chan error, 1)
+	oauthSrvErr = _oauthSrvErr
+
+	go func() { _srvErr <- srv.listen() }()
+	go func() { _oauthSrvErr <- oauthSrv.Listen() }()
+
+	return
 }

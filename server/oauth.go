@@ -1,35 +1,39 @@
 package server
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"github.com/9d4/semaphore/auth"
-	errs "github.com/9d4/semaphore/errors"
-	"github.com/9d4/semaphore/oauth"
-	"github.com/9d4/semaphore/server/middleware"
-	"github.com/9d4/semaphore/server/types"
+	"github.com/9d4/semaphore/oauth2"
+	"github.com/9d4/semaphore/oauth2/generates"
+	"github.com/9d4/semaphore/oauth2/manage"
+	o2server "github.com/9d4/semaphore/oauth2/server"
+	"github.com/9d4/semaphore/oauth2/store"
+	oredis "github.com/9d4/semaphore/oauth2/store/redis"
+	"github.com/9d4/semaphore/user"
+	redis8 "github.com/go-redis/redis/v8"
 	"github.com/go-redis/redis/v9"
+	"github.com/gofiber/fiber/v2"
+	"github.com/golang-jwt/jwt/v4"
 	jww "github.com/spf13/jwalterweatherman"
+	"gorm.io/gorm"
+	"net/http"
 	"strconv"
 	"strings"
-	"time"
-
-	"github.com/gofiber/fiber/v2"
-	"golang.org/x/exp/slices"
-	"gorm.io/gorm"
 )
+
+var ErrSuspended = errors.New("waiting user authorization")
 
 type oauthServer struct {
 	*Config
 	app *fiber.App
 	db  *gorm.DB
 	rdb *redis.Client
-}
 
-const (
-	OauthAccessTokenExpirationTime = time.Hour * 24
-)
+	manager *manage.Manager
+	server  *o2server.Server
+	mux     *http.ServeMux
+}
 
 func newOauthServer(db *gorm.DB, rdb *redis.Client, config *Config) *oauthServer {
 	os := &oauthServer{
@@ -38,178 +42,100 @@ func newOauthServer(db *gorm.DB, rdb *redis.Client, config *Config) *oauthServer
 		db:     db,
 		rdb:    rdb,
 	}
-	os.setupRoutes()
 
+	os.manager = manage.NewDefaultManager()
+	os.manager.MapAccessGenerate(generates.NewJWTAccessGenerate("semaphore-oauth2", config.KeyBytes, jwt.SigningMethodHS512))
+
+	// storages
+	clientStore := store.NewClientStoreRedis(rdb)
+	os.manager.MapClientStorage(clientStore)
+	os.manager.MapTokenStorage(oredis.NewRedisStore(&redis8.Options{
+		Addr: config.RedisAddress,
+		DB:   2,
+	}))
+
+	srv := o2server.NewServer(&o2server.Config{
+		TokenType:            "Bearer",
+		AllowedResponseTypes: []oauth2.ResponseType{oauth2.Code, oauth2.Token},
+		AllowedGrantTypes: []oauth2.GrantType{
+			oauth2.AuthorizationCode,
+			oauth2.Refreshing,
+		},
+		AllowedCodeChallengeMethods: []oauth2.CodeChallengeMethod{oauth2.CodeChallengeS256},
+	}, os.manager)
+	srv.SetClientInfoHandler(o2server.ClientFormHandler)
+	srv.SetUserAuthorizationHandler(os.handleUserAuthorization)
+
+	os.mux = http.NewServeMux()
+	os.mux.HandleFunc("/oauth2/authorize", func(w http.ResponseWriter, r *http.Request) {
+		err := srv.HandleAuthorizeRequest(w, r)
+		if err != nil {
+			if err != ErrSuspended {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+			}
+		}
+	})
+	os.mux.HandleFunc("/oauth2/token", func(w http.ResponseWriter, r *http.Request) {
+		err := srv.HandleTokenRequest(w, r)
+		if err != nil {
+			jww.ERROR.Println(err)
+		}
+	})
+
+	os.server = srv
 	return os
 }
 
-func (s *oauthServer) setupRoutes() {
-	bearerAuth := middleware.BearerAuth(s.KeyBytes)
+func (s *oauthServer) Listen() error {
+	address := strings.Split(s.Config.Address, ":")
+	newPort, err := strconv.Atoi(address[1])
+	if err != nil {
+		jww.FATAL.Fatal(err)
+	}
+	newAddr := fmt.Sprint(address[0], ":", newPort+1)
 
-	s.app.Get("/authorize", s.handleAuthorize)
-	s.app.Post("/authorize", bearerAuth, s.handleAuthorize, s.handleAuthorizePost)
-	s.app.Post("/token", s.handleExchangeToken)
+	jww.INFO.Println("OAuth Server listening on", newAddr)
+	return http.ListenAndServe(newAddr, s.mux)
 }
 
-func (s *oauthServer) handleAuthorize(c *fiber.Ctx) error {
-	queryResponseType := c.Query("response_type")
-	if queryResponseType != "code" {
-		return fiber.ErrNotAcceptable
+// check if user authenticated or not and consent screen
+func (s *oauthServer) handleUserAuthorization(w http.ResponseWriter, r *http.Request) (userID string, err error) {
+	rtCookie, err := r.Cookie("rt")
+	if err != nil {
+		s.redirectConsent(w, r, "oauth_authorize")
+		return "", fiber.ErrUnauthorized
 	}
 
-	queryResponseMode := c.Query("response_mode")
-	if queryResponseMode != "query" {
-		return fiber.ErrNotAcceptable
+	var rt refreshToken
+
+	token, err := jwt.ParseWithClaims(rtCookie.Value, &rt, auth.DefaultJwtKeyFunc(s.KeyBytes))
+	if err != nil || !token.Valid {
+		s.redirectConsent(w, r, "oauth_authorize")
+		return "", ErrSuspended
 	}
 
-	queryRedirectUri := c.Query("redirect_uri")
-	if queryRedirectUri == "" {
-		queryRedirectUri = c.GetReqHeaders()[fiber.HeaderReferer]
+	subjectID, err := strconv.Atoi(rt.Subject)
+	if err != nil {
+		return "", fiber.ErrInternalServerError
 	}
 
-	queryClientID := c.Query("client_id")
-	if queryClientID == "" {
-		return fiber.ErrNotAcceptable
+	var usr user.User
+	result := s.db.First(&usr, user.User{ID: uint(subjectID)})
+	if result.Error != nil {
+		return "", fiber.ErrUnauthorized
 	}
 
-	// Get oauth app from cache first then check on database
-	clientApp := &oauth.App{}
-	cacheKey := fmt.Sprint(oauth.CachePrefixOauthClient, queryClientID)
-	cache := s.rdb.Get(context.Background(), cacheKey)
-	if cache.Err() != nil {
-		tx := s.db.First(clientApp, oauth.App{ClientID: queryClientID})
-		if tx.Error != nil {
-			if errors.Is(gorm.ErrRecordNotFound, tx.Error) {
-				return errs.WriteErrorJSON(c, errs.ErrOauthClientNotFound)
-			}
-			jww.TRACE.Println(tx.Error)
-			return fiber.ErrNotAcceptable
-		}
-
-		// save to cache
-		status := s.rdb.Set(c.UserContext(), cacheKey, clientApp.ID, redis.KeepTTL)
-		jww.DEBUG.Println(status.Err())
-		jww.DEBUG.Println("save client to cache", cacheKey)
+	queryConsent := r.FormValue("consent")
+	if queryConsent == "1" {
+		return strconv.Itoa(int(usr.ID)), nil
 	}
 
-	queryScope := c.Query("scope")
-	if queryScope == "" {
-		return fiber.ErrNotAcceptable
-	}
-
-	var scopes []oauth.Scope
-	for _, s := range strings.Split(queryScope, " ") {
-		scopes = append(scopes, oauth.Scope(s))
-	}
-
-	// if a scopes does neither not found nor malformed nor anything
-	// we don't know, just remove from slice
-	var fixedScopes []oauth.Scope
-	for _, s := range scopes {
-		for _, definedScope := range oauth.Scopes {
-			// 		queried scopes available	 AND  no duplicate
-			if s == definedScope && !slices.Contains(fixedScopes, definedScope) {
-				fixedScopes = append(fixedScopes, definedScope)
-			}
-		}
-	}
-
-	// if the method is POST, it means the resource owner has authorized
-	// the authorization. Now generate authorization code and redirect to
-	// redirect_uri value from query.
-	if c.Method() == fiber.MethodPost {
-		scopesCtx := context.WithValue(c.UserContext(), types.ContextKey("scopes"), fixedScopes)
-		c.SetUserContext(scopesCtx)
-
-		return c.Next()
-	}
-
-	// Tells frontend from which backend part is the redirection.
-	queryRedirectedFrom := "from=oauth_authorize"
-
-	authorizationViewRoute := fmt.Sprint("/o", string(c.Request().URI().Path()), "?", queryRedirectedFrom, "&", string(c.Request().URI().QueryString()))
-	return c.Redirect(authorizationViewRoute, fiber.StatusSeeOther)
+	w.Header().Set("Location", "/o/oauth/authorize?"+r.URL.RawQuery)
+	w.WriteHeader(http.StatusFound)
+	return "", ErrSuspended
 }
 
-func (s *oauthServer) handleAuthorizePost(c *fiber.Ctx) error {
-	var (
-		stores = oauth.NewStore(s.db, s.rdb)
-
-		scopes []oauth.Scope
-	)
-
-	scopes, ok := c.UserContext().Value(types.ContextKey("scopes")).([]oauth.Scope)
-	if !ok {
-		return fiber.ErrInternalServerError
-	}
-
-	at, ok := c.UserContext().Value(types.ContextKey("access_token")).(*auth.AccessToken)
-	if !ok {
-		return fiber.ErrInternalServerError
-	}
-
-	authorizationCode, err := stores.GenerateAuthorizationCode(scopes, c.Query("client_id"), strconv.Itoa(int(at.User.ID)))
-	if err != nil {
-		return fiber.ErrInternalServerError
-	}
-
-	// Send redirect uri to frontend
-	targetUri := fmt.Sprint(c.Query("redirect_uri"), "?code=", authorizationCode.Code)
-
-	if c.SendStatus(fiber.StatusCreated) != nil {
-		return err
-	}
-
-	return c.JSON(map[string]interface{}{
-		"target_uri": targetUri,
-	})
-}
-
-func (s *oauthServer) handleExchangeToken(c *fiber.Ctx) error {
-	var body struct {
-		Code string `json:"authorization_code"`
-	}
-
-	err := c.BodyParser(&body)
-	if err != nil {
-		return fiber.ErrBadRequest
-	}
-
-	store := oauth.NewStore(s.db, s.rdb)
-	authorizationCode, err := store.GetAuthorizationCode(body.Code)
-	if err != nil {
-		if err == redis.Nil {
-			return fiber.ErrNotFound
-		}
-		jww.TRACE.Println("oauth:handleExchangeToken:error getting auth code detail from cache:", err)
-		return fiber.ErrInternalServerError
-	}
-
-	at, err := oauth.GenerateAccessToken(s.KeyBytes, OauthAccessTokenExpirationTime, authorizationCode.Subject, authorizationCode.ClientID)
-	if err != nil {
-		return fiber.ErrInternalServerError
-	}
-
-	return c.JSON(map[string]interface{}{
-		"access_token": at,
-	})
-}
-
-func (s *oauthServer) withBearerAuth(c *fiber.Ctx) error {
-	authorizationPrefix := "Bearer "
-	authHeader := c.GetReqHeaders()[fiber.HeaderAuthorization]
-
-	if authHeader == "" {
-		return fiber.ErrUnauthorized
-	}
-
-	token := strings.TrimPrefix(authHeader, authorizationPrefix)
-	at, err := auth.ValidateAccessToken(token, auth.DefaultJwtKeyFunc(s.KeyBytes))
-	if err != nil {
-		return fiber.ErrUnauthorized
-	}
-
-	ctx := context.WithValue(c.UserContext(), types.ContextKey("access_token"), at)
-	c.SetUserContext(ctx)
-	return c.Next()
+func (s *oauthServer) redirectConsent(w http.ResponseWriter, r *http.Request, from string) {
+	w.Header().Set("Location", "/o/oauth/authorize?"+r.URL.RawQuery+"&from="+from)
+	w.WriteHeader(http.StatusFound)
 }

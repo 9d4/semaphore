@@ -69,7 +69,7 @@ export default {
       const query = this.$route.query;
       if (query.from === "oauth_authorize") {
         // now throw the user back to oauth
-        window.location = `${window.location.origin}/oauth/authorize${window.location.search}`;
+        window.location = `${window.location.origin}/oauth2/authorize${window.location.search}`;
         return;
       }
 
