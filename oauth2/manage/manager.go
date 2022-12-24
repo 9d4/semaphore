@@ -287,7 +287,7 @@ func (m *Manager) GenerateAccessToken(ctx context.Context, gt oauth2.GrantType, 
 		if !cliPass.VerifyPassword(tgr.ClientSecret) {
 			return nil, errors.ErrInvalidClient
 		}
-	} else if len(cli.GetSecret()) > 0 && tgr.ClientSecret != cli.GetSecret() {
+	} else if (tgr.CodeVerifier == "") && len(cli.GetSecret()) > 0 && tgr.ClientSecret != cli.GetSecret() {
 		return nil, errors.ErrInvalidClient
 	}
 	if tgr.RedirectURI != "" {
