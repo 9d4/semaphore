@@ -7,6 +7,7 @@ import (
 	"github.com/9d4/semaphore/oauth2"
 	"github.com/9d4/semaphore/oauth2/generates"
 	"github.com/9d4/semaphore/oauth2/manage"
+	"github.com/9d4/semaphore/oauth2/models"
 	o2server "github.com/9d4/semaphore/oauth2/server"
 	"github.com/9d4/semaphore/oauth2/store"
 	oredis "github.com/9d4/semaphore/oauth2/store/redis"
@@ -48,6 +49,11 @@ func newOauthServer(db *gorm.DB, rdb *redis.Client, config *Config) *oauthServer
 
 	// storages
 	clientStore := store.NewClientStoreRedis(rdb)
+	_ = clientStore.Set("mymoodle", &models.Client{
+		ID:     "mymoodle",
+		Secret: "mymoodle-secret",
+		Domain: "moodle.test",
+	})
 	os.manager.MapClientStorage(clientStore)
 	os.manager.MapTokenStorage(oredis.NewRedisStore(&redis8.Options{
 		Addr: config.RedisAddress,
@@ -69,6 +75,7 @@ func newOauthServer(db *gorm.DB, rdb *redis.Client, config *Config) *oauthServer
 
 	srv.SetClientInfoHandler(o2server.ClientBasicHandler)
 	srv.SetUserAuthorizationHandler(os.handleUserAuthorization)
+	srv.SetAuthorizeScopeHandler(os.handleAuthorizeScope)
 
 	os.mux = http.NewServeMux()
 	os.mux.HandleFunc("/oauth2/authorize", func(w http.ResponseWriter, r *http.Request) {
@@ -142,4 +149,31 @@ func (s *oauthServer) handleUserAuthorization(w http.ResponseWriter, r *http.Req
 func (s *oauthServer) redirectConsent(w http.ResponseWriter, r *http.Request, from string) {
 	w.Header().Set("Location", "/o/oauth/authorize?"+r.URL.RawQuery+"&from="+from)
 	w.WriteHeader(http.StatusFound)
+}
+
+func (s *oauthServer) handleAuthorizeScope(w http.ResponseWriter, r *http.Request) (scope string, err error) {
+	reqScopesRaw := r.FormValue("scope")
+	reqScopes := strings.Split(strings.TrimSpace(reqScopesRaw), " ")
+	for _, s := range reqScopes {
+		if OAuth2Scopes[s] != "" {
+			scope = scope + s + " "
+		}
+	}
+
+	scope = strings.TrimSpace(scope)
+	return
+}
+
+type OAuth2Scope string
+
+const (
+	ScopeEmail OAuth2Scope = "email"
+)
+
+var OAuth2Scopes map[string]OAuth2Scope = getOAuth2Scopes()
+
+func getOAuth2Scopes() map[string]OAuth2Scope {
+	m := make(map[string]OAuth2Scope)
+	m[string(ScopeEmail)] = ScopeEmail
+	return m
 }
