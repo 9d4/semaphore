@@ -61,9 +61,13 @@ func newOauthServer(db *gorm.DB, rdb *redis.Client, config *Config) *oauthServer
 			oauth2.AuthorizationCode,
 			oauth2.Refreshing,
 		},
-		AllowedCodeChallengeMethods: []oauth2.CodeChallengeMethod{oauth2.CodeChallengeS256},
+		AllowedCodeChallengeMethods: []oauth2.CodeChallengeMethod{
+			oauth2.CodeChallengePlain,
+			oauth2.CodeChallengeS256,
+		},
 	}, os.manager)
-	srv.SetClientInfoHandler(o2server.ClientFormHandler)
+
+	srv.SetClientInfoHandler(o2server.ClientBasicHandler)
 	srv.SetUserAuthorizationHandler(os.handleUserAuthorization)
 
 	os.mux = http.NewServeMux()
