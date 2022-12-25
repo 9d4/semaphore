@@ -26,11 +26,12 @@ func (a *JWTAccessClaims) Valid() error {
 }
 
 // NewJWTAccessGenerate create to generate the jwt access token instance
-func NewJWTAccessGenerate(kid string, key []byte, method jwt.SigningMethod) *JWTAccessGenerate {
+func NewJWTAccessGenerate(issuer string, kid string, key []byte, method jwt.SigningMethod) *JWTAccessGenerate {
 	return &JWTAccessGenerate{
 		SignedKeyID:  kid,
 		SignedKey:    key,
 		SignedMethod: method,
+		Issuer:       issuer,
 	}
 }
 
@@ -39,12 +40,14 @@ type JWTAccessGenerate struct {
 	SignedKeyID  string
 	SignedKey    []byte
 	SignedMethod jwt.SigningMethod
+	Issuer       string
 }
 
 // Token based on the UUID generated token
 func (a *JWTAccessGenerate) Token(ctx context.Context, data *oauth2.GenerateBasic, isGenRefresh bool) (string, string, error) {
 	claims := &JWTAccessClaims{
 		StandardClaims: jwt.StandardClaims{
+			Issuer:    a.Issuer,
 			Audience:  data.Client.GetID(),
 			Subject:   data.UserID,
 			ExpiresAt: data.TokenInfo.GetAccessCreateAt().Add(data.TokenInfo.GetAccessExpiresIn()).Unix(),

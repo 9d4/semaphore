@@ -40,7 +40,7 @@ func (s *server) setupRoutes() {
 	authRouter.Post("/login", s.handleLogin)
 
 	oauthResourceServer := newOAuthResourceServer(s.db, s.Config)
-	s.app.Mount("/api/oauth", oauthResourceServer.App)
+	s.app.Mount("/api/oauth2", oauthResourceServer.App)
 
 	apiSrv := newApiServer(s.db, s.Config)
 	s.app.Mount("/api", apiSrv.app)

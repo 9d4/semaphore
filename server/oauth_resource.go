@@ -2,7 +2,7 @@ package server
 
 import (
 	"errors"
-	"github.com/9d4/semaphore/oauth"
+	"github.com/9d4/semaphore/oauth2/generates"
 	"github.com/9d4/semaphore/server/middleware"
 	"github.com/9d4/semaphore/server/types"
 	"github.com/9d4/semaphore/user"
@@ -54,11 +54,11 @@ func (s *oAuthResourceServer) setupRoutes() {
 	bearerAuth := middleware.OAuthBearerAuth(s.KeyBytes)
 
 	router := s.Group("/", bearerAuth)
-	router.Get("/user", s.handleUserInfo)
+	router.Get("/userinfo", s.handleUserInfo)
 }
 
 func (s *oAuthResourceServer) handleUserInfo(c *fiber.Ctx) error {
-	at, err := useContext[*oauth.AccessToken](c, "access_token")
+	at, err := useContext[generates.JWTAccessClaims](c, "access_token")
 	if err != nil {
 		return fiber.ErrInternalServerError
 	}

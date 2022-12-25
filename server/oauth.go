@@ -31,9 +31,10 @@ type oauthServer struct {
 	db  *gorm.DB
 	rdb *redis.Client
 
-	manager *manage.Manager
-	server  *o2server.Server
-	mux     *http.ServeMux
+	manager    *manage.Manager
+	tokenStore oauth2.TokenStore
+	server     *o2server.Server
+	mux        *http.ServeMux
 }
 
 func newOauthServer(db *gorm.DB, rdb *redis.Client, config *Config) *oauthServer {
@@ -45,7 +46,7 @@ func newOauthServer(db *gorm.DB, rdb *redis.Client, config *Config) *oauthServer
 	}
 
 	os.manager = manage.NewDefaultManager()
-	os.manager.MapAccessGenerate(generates.NewJWTAccessGenerate("semaphore-oauth2", config.KeyBytes, jwt.SigningMethodHS512))
+	os.manager.MapAccessGenerate(generates.NewJWTAccessGenerate("http://semaphore.test", "semaphore-oauth2", config.KeyBytes, jwt.SigningMethodHS512))
 
 	// storages
 	clientStore := store.NewClientStoreRedis(rdb)
@@ -54,11 +55,13 @@ func newOauthServer(db *gorm.DB, rdb *redis.Client, config *Config) *oauthServer
 		Secret: "mymoodle-secret",
 		Domain: "moodle.test",
 	})
-	os.manager.MapClientStorage(clientStore)
-	os.manager.MapTokenStorage(oredis.NewRedisStore(&redis8.Options{
+	os.tokenStore = oredis.NewRedisStore(&redis8.Options{
 		Addr: config.RedisAddress,
 		DB:   2,
-	}))
+	})
+
+	os.manager.MapClientStorage(clientStore)
+	os.manager.MapTokenStorage(os.tokenStore)
 
 	srv := o2server.NewServer(&o2server.Config{
 		TokenType:            "Bearer",
