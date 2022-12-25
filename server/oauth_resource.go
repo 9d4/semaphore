@@ -71,7 +71,19 @@ func (s *oAuthResourceServer) handleUserInfo(c *fiber.Ctx) error {
 		return fiber.ErrInternalServerError
 	}
 
-	return c.JSON(usr)
+	userinfo := struct {
+		ID        uint           `json:"id"`
+		Email     string         `json:"email"`
+		FirstName string         `json:"firstname"`
+		LastName  string         `json:"lastname"`
+	}{
+		ID: usr.ID,
+		Email: usr.Email,
+		FirstName : usr.FirstName,
+		LastName : usr.LastName,
+	}
+
+	return c.JSON(userinfo)
 }
 
 func useContext[T interface{}](c *fiber.Ctx, key types.ContextKey) (T, error) {
