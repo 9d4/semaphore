@@ -13,7 +13,21 @@ export async function authNow(email, password) {
     }),
   });
 
-  return res.status <= 400;
+  let ret = { success: true, error: null };
+
+  if (res.status === 200) {
+    return ret;
+  }
+
+  if (res.status === 401) {
+    ret.success = false;
+    ret.error = "Credential not found";
+    return ret;
+  }
+
+  ret.success = false;
+  ret.error = res.statusText;
+  return ret;
 }
 
 export async function authRenew() {

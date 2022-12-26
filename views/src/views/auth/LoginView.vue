@@ -1,10 +1,18 @@
+<script setup>
+import logo from "@/assets/images/logo.png";
+</script>
 <template>
   <div class="container mx-auto px-4">
+    <div class="flex justify-center mt-10">
+      <img class="w-24" :src="logo" />
+    </div>
     <div
-      class="card w-full md:w-96 bg-base-300 shadow-xl mx-auto mt-5 md:mt-36"
+      class="card w-full md:w-96 bg-base-300 shadow-xl mx-auto mt-10 md:mt-24"
     >
       <div class="card-body">
-        <div class="card-title mb-6">Login</div>
+        <div class="card-title">Login</div>
+        <p class="mb-5">Login to access your account.</p>
+
         <div class="alert alert-error shadow-lg mb-3" v-if="error">
           <div>
             <svg
@@ -47,6 +55,7 @@
 
 <script>
 import { authNow } from "@/utils/auth";
+
 export default {
   data: () => ({
     login: "",
@@ -57,10 +66,10 @@ export default {
   methods: {
     async loginHandler() {
       this.error = "";
-      const ok = await authNow(this.login, this.password);
+      const res = await authNow(this.login, this.password);
 
-      if (!ok) {
-        this.error = "Credential does not found";
+      if (!res.success) {
+        this.error = res.error;
         return;
       }
 
