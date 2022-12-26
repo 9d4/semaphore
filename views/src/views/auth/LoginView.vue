@@ -7,7 +7,7 @@ import logo from "@/assets/images/logo.png";
       <img class="w-24" :src="logo" />
     </div>
     <div
-      class="card w-full md:w-96 bg-base-300 shadow-xl mx-auto mt-10 md:mt-24"
+      class="card w-full md:w-96 dark:bg-base-300 dark:shadow-xl mx-auto mt-10 md:mt-20"
     >
       <div class="card-body">
         <div class="card-title">Login</div>
@@ -35,13 +35,13 @@ import logo from "@/assets/images/logo.png";
           <input
             type="email"
             placeholder="Email"
-            class="input w-full mb-4"
+            class="input input-bordered input-accent dark:input-secondary w-full mb-4"
             v-model="login"
           />
           <input
             type="password"
             placeholder="Password"
-            class="input w-full mb-4"
+            class="input input-bordered input-accent dark:input-secondary w-full mb-4"
             v-model="password"
           />
           <div class="flex justify-end">

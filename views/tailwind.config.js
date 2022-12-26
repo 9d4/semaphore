@@ -1,6 +1,7 @@
 /* eslint-disable no-undef */
 module.exports = {
   content: ["./src/**/*.{vue,js,ts}"],
+  darkMode: "class",
   plugins: [require("daisyui")],
   daisyui: {
     themes: [

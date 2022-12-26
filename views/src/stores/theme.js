@@ -25,6 +25,13 @@ export const useThemeStore = defineStore("theme", {
     setHtmlTheme(theme = "") {
       this.theme = (theme === "") ? this.theme : theme;
       document.querySelector("html").setAttribute("data-theme", this.theme);
+
+      if (this.theme === "dark") {
+        document.querySelector("html").classList.add("dark");
+        return;
+      }
+
+      document.querySelector("html").classList.remove("dark");
     },
     setThemeByOS() {
       switch (getOsColorScheme()) {
