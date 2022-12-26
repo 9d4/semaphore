@@ -11,6 +11,7 @@
   "dependencies": {
     "js-base64": "^3.7.3",
     "pinia": "^2.0.26",
+    "superagent": "^8.0.6",
     "vue": "^3.2.45",
     "vue-router": "^4.1.6"
   },

@@ -11,8 +11,8 @@
         <input
           type="text"
           class="input input-bordered input-sm w-full"
-          disabled="!ro"
-          :value="claims.user.email"
+          :disabled="ro"
+          :value="userdata.email"
         />
       </div>
       <div class="form-control w-full mb-6">
@@ -22,8 +22,8 @@
         <input
           type="text"
           class="input input-bordered input-sm w-full"
-          disabled="!ro"
-          :value="claims.user.firstname"
+          :disabled="ro"
+          :value="userdata.firstname"
         />
       </div>
       <div class="form-control w-full mb-6">
@@ -33,8 +33,8 @@
         <input
           type="text"
           class="input input-bordered input-sm w-full"
-          disabled="!ro"
-          :value="claims.user.lastname"
+          :disabled="ro"
+          :value="userdata.lastname"
         />
       </div>
     </form>
@@ -42,10 +42,24 @@
 </template>
 
 <script>
+import agents from "@/agent";
+
 export default {
   props: ["claims"],
   data: () => ({
     ro: true,
+    userdata: {
+      id: "",
+      email: "",
+      firstname: "",
+      lastname: "",
+    },
   }),
+  beforeCreate() {
+    agents.Users.get(this.claims.user.id).then(({ res }) => {
+      let u = this.userdata;
+      this.userdata = { ...u, ...res };
+    });
+  },
 };
 </script>
