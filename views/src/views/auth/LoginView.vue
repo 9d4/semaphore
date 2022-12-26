@@ -47,7 +47,6 @@
 
 <script>
 import { authNow } from "@/utils/auth";
-document.getElementsByTagName("html")[0].setAttribute("data-theme", "dark");
 export default {
   data: () => ({
     login: "",

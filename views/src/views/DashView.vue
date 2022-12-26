@@ -24,7 +24,6 @@
 </template>
 
 <script>
-document.getElementsByTagName("html")[0].setAttribute("data-theme", "dracula");
 import GreetingTron from "../components/GreetingTron.vue";
 import ProfileList from "../components/ProfileList.vue";
 import { useAuthStore } from "../stores/auth";
