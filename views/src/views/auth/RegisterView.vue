@@ -99,7 +99,7 @@ import LoadingLogo from "@/components/LoadingLogo.vue";
 export default {
   components: { LoadingLogo },
   data: () => ({
-    email: "telo@gg.gg",
+    email: "",
     firstname: "",
     lastname: "",
     password: "",
