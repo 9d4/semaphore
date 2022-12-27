@@ -8,6 +8,11 @@ const responseBody = (res) => ({
   raw: res,
 });
 
+const error = (err) => ({
+  res: err.response.body,
+  raw: err.response,
+});
+
 const authStore = useAuthStore();
 const tokenPlugin = (req) => {
   if (authStore.accessToken) {
@@ -29,11 +34,18 @@ const requests = {
     superagent
       .post(`${API_ROOT}${url}`, body)
       .use(tokenPlugin)
-      .then(responseBody),
+      .then(responseBody)
+      .catch(error),
 };
 
 const Users = {
   get: (userID) => requests.get(`/users/${userID}/profile`),
+  register: (body) =>
+    new Promise((resolve) => {
+      setTimeout(() => {
+        resolve(requests.post("/users", body));
+      }, 200);
+    }),
 };
 
 const agents = {

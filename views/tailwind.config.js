@@ -2,6 +2,12 @@
 module.exports = {
   content: ["./src/**/*.{vue,js,ts}"],
   darkMode: "class",
+  theme: {
+    fontFamily: {
+      poppins: ["Poppins", "sans-serif"],
+      inter: ["Inter Tight", "sans-serif"],
+    },
+  },
   plugins: [require("daisyui")],
   daisyui: {
     themes: [

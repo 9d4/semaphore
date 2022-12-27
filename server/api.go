@@ -7,6 +7,8 @@ import (
 	errs "github.com/9d4/semaphore/errors"
 	"github.com/9d4/semaphore/server/middleware"
 	"github.com/9d4/semaphore/server/types"
+	"github.com/go-playground/validator/v10"
+	jww "github.com/spf13/jwalterweatherman"
 	"sort"
 	"strconv"
 	"time"
@@ -80,6 +82,7 @@ func (s *apiServer) setupRoutes() {
 	s.app.Post("/renew", s.handleRenew)
 	users := s.app.Group("users/")
 	users.Get(":userid/profile", bearerAuth, s.handleUsersProfile)
+	users.Post("/", s.handleUsersStore)
 }
 
 func (s *apiServer) handleLogin(c *fiber.Ctx) error {
@@ -186,6 +189,37 @@ func (s *apiServer) handleUsersProfile(c *fiber.Ctx) error {
 	return c.JSON(usr)
 }
 
+func (s *apiServer) handleUsersStore(c *fiber.Ctx) error {
+	body := struct {
+		Email     string `json:"email"`
+		FirstName string `json:"firstname"`
+		LastName  string `json:"lastname"`
+		Password  string `json:"password"`
+	}{}
+	err := c.BodyParser(&body)
+	if err != nil {
+		jww.ERROR.Println("user:store:", err)
+		return fiber.ErrInternalServerError
+	}
+
+	usr := &user.User{
+		Email:     body.Email,
+		FirstName: body.FirstName,
+		LastName:  body.LastName,
+		Password:  body.Password,
+	}
+
+	err = user.Validate(usr)
+	if err != nil {
+		validationErrors := err.(validator.ValidationErrors)
+		return replyValidationErrors(c, validationErrors)
+	}
+
+	//TODO: save user to be implemented
+	c.SendStatus(fiber.StatusCreated)
+	return c.JSON(usr)
+}
+
 func (s *apiServer) bearerAuth(c *fiber.Ctx) error {
 	token, err := serverutil.GetBearerToken(c)
 	if err != nil {
@@ -212,4 +246,23 @@ func (s *apiServer) generateTokenPair(usr user.User) (map[string]string, error) 
 		"access_token":  at,
 		"refresh_token": rt,
 	}, nil
+}
+
+func replyValidationErrors(c *fiber.Ctx, validationErrors validator.ValidationErrors) error {
+	type e struct {
+		// represents what field has error
+		Field string `json:"field"`
+		Tag   string `json:"tag"`
+		Param string `json:"param"`
+	}
+	errrs := struct {
+		Errors []e `json:"errors"`
+	}{}
+
+	for _, ve := range validationErrors {
+		errrs.Errors = append(errrs.Errors, e{user.UserFieldJsonMap[ve.Field()], ve.Tag(), ve.Param()})
+	}
+
+	c.SendStatus(fiber.StatusBadRequest)
+	return c.JSON(errrs)
 }

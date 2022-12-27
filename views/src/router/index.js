@@ -12,7 +12,19 @@ const router = createRouter({
     {
       path: "/login",
       name: "login",
-      component: () => import("../views/auth/LoginView.vue"),
+      component: () => import("../views/auth/AuthView.vue"),
+      beforeEnter: () => {
+        const authStore = useAuthStore();
+
+        if (authStore.isLogged) {
+          return { path: "/" };
+        }
+      },
+    },
+    {
+      path: "/register",
+      name: "register",
+      component: () => import("../views/auth/AuthView.vue"),
       beforeEnter: () => {
         const authStore = useAuthStore();
 
@@ -29,9 +41,11 @@ const router = createRouter({
   ],
 });
 
+const unauthenticatedRoutes = ["login", "register"];
+
 router.beforeEach((to) => {
   const authStore = useAuthStore();
-  if (!authStore.isLogged && to.name !== "login") {
+  if (!authStore.isLogged && !unauthenticatedRoutes.includes(to.name)) {
     return { name: "login", query: to.query };
   }
 });
