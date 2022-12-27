@@ -1,5 +1,5 @@
 <script setup>
-import logo from "@/assets/images/logo.png";
+import logo from "@/assets/images/logo.svg";
 </script>
 <template>
   <div class="flex flex-col justify-center w-fit items-center">

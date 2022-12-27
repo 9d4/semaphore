@@ -1,5 +1,5 @@
 <script setup>
-import logo from "@/assets/images/logo.png";
+import logo from "@/assets/images/logo.svg";
 </script>
 <template>
   <div class="container mx-auto px-4 font-inter pb-8">
