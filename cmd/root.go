@@ -1,15 +1,16 @@
 package cmd
 
 import (
+	"log"
+	"os"
+	"strings"
+
 	"github.com/9d4/semaphore/server"
 	"github.com/joho/godotenv"
 	"github.com/spf13/cobra"
 	jww "github.com/spf13/jwalterweatherman"
 	flag "github.com/spf13/pflag"
 	"github.com/spf13/viper"
-	"log"
-	"os"
-	"strings"
 )
 
 var rootCmd = cobra.Command{

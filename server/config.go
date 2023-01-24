@@ -1,33 +1,29 @@
 package server
 
 import (
+	"reflect"
+	"strings"
+
 	"github.com/9d4/semaphore/util"
 	"github.com/spf13/viper"
-	"reflect"
 )
 
-var (
-	defaultConfig *Config = &Config{
-		v:             nil,
-		Address:       "0.0.0.0:3500",
-		DBHost:        "127.0.0.1",
-		DBPort:        5432,
-		DBName:        "semaphore",
-		DBUsername:    "semaphore",
-		DBPassword:    "smphr",
-		RedisAddress:  "127.0.0.1:6379",
-		RedisUsername: "default",
-		RedisPassword: "t00r",
-	}
-	initializedDefaults = false
-)
+var defaultConfig *Config = &Config{
+	v:             nil,
+	Address:       "0.0.0.0:3500",
+	DBHost:        "127.0.0.1",
+	DBPort:        5432,
+	DBName:        "semaphore",
+	DBUsername:    "semaphore",
+	DBPassword:    "smphr",
+	RedisAddress:  "127.0.0.1:6379",
+	RedisUsername: "default",
+	RedisPassword: "t00r",
+}
 
 func init() {
-	if !initializedDefaults {
-		defaultConfig.Key = util.GenerateKey()
-		defaultConfig.KeyBytes = util.StringToBytes(defaultConfig.Key)
-		initializedDefaults = true
-	}
+	defaultConfig.Key = util.GenerateKey()
+	defaultConfig.KeyBytes = util.StringToBytes(defaultConfig.Key)
 }
 
 // Config is configuration for the http server to be able to run.
@@ -71,6 +67,8 @@ func ParseViper(v *viper.Viper) *Config {
 
 func parseViper(v *viper.Viper, defaultConf *Config) *Config {
 	c := &Config{v: v}
+
+	c.v.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
 
 	c.Key = getOrDefault(v.GetString("app_key"), defaultConf.Key)
 
