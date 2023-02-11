@@ -188,10 +188,10 @@ func (s *Server) ValidationAuthorizeRequest(r *http.Request) (*AuthorizeRequest,
 	}
 
 	ccm := oauth2.CodeChallengeMethod(r.FormValue("code_challenge_method"))
-	// set default
-	if ccm == "" {
-		ccm = oauth2.CodeChallengePlain
-	}
+	//// set default
+	//if ccm == "" {
+	//	ccm = oauth2.CodeChallengePlain
+	//}
 	if ccm != "" && !s.CheckCodeChallengeMethod(ccm) {
 		return nil, errors.ErrUnsupportedCodeChallengeMethod
 	}
