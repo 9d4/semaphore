@@ -92,6 +92,7 @@ func initLogger() {
 		jww.SetLogOutput(logWriter)
 	}
 
+	jww.SetFlags(log.Lshortfile)
 	jww.SetLogThreshold(jww.LevelTrace)
 	jww.SetStdoutThreshold(jww.LevelInfo)
 }
