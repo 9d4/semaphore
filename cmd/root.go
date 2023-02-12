@@ -80,6 +80,7 @@ func loadFlags() {
 	globalFlags.String("db-name", "semaphore", "Database name")
 	globalFlags.String("db-username", "semaphore", "Database user")
 	globalFlags.String("db-password", "smphr", "Database password")
+	globalFlags.BoolP("log-request", "l", false, "Print incoming request log")
 }
 
 func loadLogger() {

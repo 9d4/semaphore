@@ -18,6 +18,7 @@ import (
 
 	"github.com/9d4/semaphore/user"
 	"github.com/gofiber/fiber/v2"
+	fiberlogger "github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/spf13/viper"
 	"gorm.io/gorm"
 )
@@ -31,6 +32,17 @@ type server struct {
 }
 
 func (s *server) setupRoutes() {
+	requestLogWriter := jww.TRACE.Writer()
+	if s.LogRequest {
+		requestLogWriter = jww.INFO.Writer()
+	}
+
+	s.app.Use(fiberlogger.New(fiberlogger.Config{
+		Format:     "${time} ${pid} ${locals:requestid} [${ip}]:${port} ${status} - ${method} ${path}\n",
+		Output:     requestLogWriter,
+		TimeFormat: "2006/01/02 15:04:05",
+	}))
+
 	s.app.Static("/", "./views/dist/", fiber.Static{
 		Compress: true,
 		Browse:   false,

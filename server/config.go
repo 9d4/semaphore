@@ -19,6 +19,7 @@ var defaultConfig *Config = &Config{
 	RedisAddress:  "127.0.0.1:6379",
 	RedisUsername: "default",
 	RedisPassword: "t00r",
+	LogRequest:    false,
 }
 
 func init() {
@@ -44,6 +45,8 @@ type Config struct {
 	RedisAddress  string
 	RedisUsername string
 	RedisPassword string
+
+	LogRequest bool
 }
 
 func (c *Config) Apply(conf *Config) error {
@@ -87,6 +90,7 @@ func parseViper(v *viper.Viper, defaultConf *Config) *Config {
 	c.RedisAddress = getOrDefault(v.GetString("redis-address"), defaultConf.RedisAddress)
 	c.RedisUsername = getOrDefault(v.GetString("redis-username"), defaultConf.RedisUsername)
 	c.RedisPassword = getOrDefault(v.GetString("redis-password"), defaultConf.RedisPassword)
+	c.LogRequest = getOrDefault(v.GetBool("log-request"), defaultConf.LogRequest)
 
 	return c
 }
