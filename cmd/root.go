@@ -40,8 +40,8 @@ var (
 )
 
 func init() {
-	initFlags()
-	cobra.OnInitialize(func() { loadEnv(); initConfig(); initLogger() })
+	loadFlags()
+	cobra.OnInitialize(func() { loadEnv(); loadConfig(); loadLogger() })
 
 	rootCmd.PersistentFlags().AddFlagSet(globalFlags)
 	rootCmd.Flags().AddFlagSet(serverFlags)
@@ -64,7 +64,7 @@ func loadEnv() {
 	}
 }
 
-func initConfig() {
+func loadConfig() {
 	v.AutomaticEnv()
 	err := v.ReadInConfig()
 	if err != nil {
@@ -72,7 +72,7 @@ func initConfig() {
 	}
 }
 
-func initFlags() {
+func loadFlags() {
 	serverFlags.StringP("address", "a", "0.0.0.0:3500", "Address to listen on")
 
 	globalFlags.String("db-host", "127.0.0.1", "Database host")
@@ -82,7 +82,7 @@ func initFlags() {
 	globalFlags.String("db-password", "smphr", "Database password")
 }
 
-func initLogger() {
+func loadLogger() {
 	logWriter, err := os.OpenFile("semaphore.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 	if err != nil {
 		log.Println("Unable to create log file:", err)
