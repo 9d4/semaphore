@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/9d4/semaphore/auth"
@@ -38,7 +39,12 @@ func (s *server) setupRoutes() {
 	}
 
 	s.app.Use(fiberlogger.New(fiberlogger.Config{
-		Format:     "${time} ${pid} ${locals:requestid} [${ip}]:${port} ${status} - ${method} ${path}\n",
+		CustomTags: map[string]fiberlogger.LogFunc{
+			"ips": func(output fiberlogger.Buffer, c *fiber.Ctx, data *fiberlogger.Data, extraParam string) (int, error) {
+				return output.WriteString(strings.Join(c.IPs(), ">>"))
+			},
+		},
+		Format:     "${time} ${pid} ${locals:requestid} [${ips}] [${ip}]:${port} ${status} - ${method} ${path}\n",
 		Output:     requestLogWriter,
 		TimeFormat: "2006/01/02 15:04:05",
 	}))
