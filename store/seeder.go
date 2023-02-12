@@ -1,7 +1,6 @@
 package store
 
 import (
-	"github.com/9d4/semaphore/oauth"
 	"github.com/9d4/semaphore/user"
 	"github.com/9d4/semaphore/util"
 	"github.com/go-redis/redis/v9"
@@ -15,13 +14,7 @@ func Seed(db *gorm.DB, rdb *redis.Client) error {
 		FirstName: "Admin",
 		Password:  hashPasswd("adm1n"),
 	})
-
-	oauthStore := oauth.NewStore(db, rdb)
-	oauthStore.Create(&oauth.App{
-		Name:     "TestApp",
-		ClientID: "test-app-client_id",
-	})
-
+	
 	return nil
 }
 
