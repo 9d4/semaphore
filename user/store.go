@@ -1,6 +1,7 @@
 package user
 
 import (
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 	"strings"
 )
@@ -116,6 +117,13 @@ func (s *store) Migrate() error {
 }
 
 func (s *store) Create(u *User) error {
+	uuid, err := uuid.NewUUID()
+	if err != nil {
+		return err
+	}
+
+	u.UUID = uuid.String()
+
 	tx := s.db.Create(u)
 
 	return tx.Error

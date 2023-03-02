@@ -25,11 +25,11 @@ func Test_store_Create(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		var count int64
-		store.DB().Model(User{}).Count(&count)
+		createdUser := &User{}
+		store.DB().Find(createdUser)
 
-		if count != 1 {
-			t.Fatalf("records count want: %d, got %d", 1, count)
+		if createdUser.UUID == "" {
+			t.Fatal("the created user uuid should not be empty")
 		}
 	})
 }
