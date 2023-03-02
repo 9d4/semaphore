@@ -33,21 +33,7 @@ type server struct {
 }
 
 func (s *server) setupRoutes() {
-	requestLogWriter := jww.TRACE.Writer()
-	if s.LogRequest {
-		requestLogWriter = jww.INFO.Writer()
-	}
-
-	s.app.Use(fiberlogger.New(fiberlogger.Config{
-		CustomTags: map[string]fiberlogger.LogFunc{
-			"ips": func(output fiberlogger.Buffer, c *fiber.Ctx, data *fiberlogger.Data, extraParam string) (int, error) {
-				return output.WriteString(strings.Join(c.IPs(), ">>"))
-			},
-		},
-		Format:     "${time} ${pid} ${locals:requestid} [${ips}] [${ip}]:${port} ${status} - ${method} ${path}\n",
-		Output:     requestLogWriter,
-		TimeFormat: "2006/01/02 15:04:05",
-	}))
+	s.app.Use(s.handleLogger())
 
 	s.app.Static("/", "./views/dist/", fiber.Static{
 		Compress: true,
@@ -70,6 +56,24 @@ func (s *server) setupRoutes() {
 
 func (s *server) listen() error {
 	return s.app.Listen(s.Address)
+}
+
+func (s *server) handleLogger() fiber.Handler {
+	requestLogWriter := jww.TRACE.Writer()
+	if s.LogRequest {
+		requestLogWriter = jww.INFO.Writer()
+	}
+
+	return fiberlogger.New(fiberlogger.Config{
+		CustomTags: map[string]fiberlogger.LogFunc{
+			"ips": func(output fiberlogger.Buffer, c *fiber.Ctx, data *fiberlogger.Data, extraParam string) (int, error) {
+				return output.WriteString(strings.Join(c.IPs(), ">>"))
+			},
+		},
+		Format:     "${time} ${pid} ${locals:requestid} [${ips}] [${ip}]:${port} ${status} - ${method} ${path}\n",
+		Output:     requestLogWriter,
+		TimeFormat: "2006/01/02 15:04:05",
+	})
 }
 
 func (s *server) handleLogin(c *fiber.Ctx) error {
