@@ -9,7 +9,6 @@ require (
 	github.com/go-redis/redis/v9 v9.0.0-rc.2
 	github.com/go-session/session v3.1.2+incompatible
 	github.com/gofiber/fiber/v2 v2.40.1
-	github.com/gofrs/uuid v4.3.1+incompatible
 	github.com/golang-jwt/jwt v3.2.1+incompatible
 	github.com/golang-jwt/jwt/v4 v4.4.3
 	github.com/google/uuid v1.1.2
@@ -36,6 +35,7 @@ require (
 	github.com/fatih/structs v1.1.0 // indirect
 	github.com/go-playground/locales v0.14.0 // indirect
 	github.com/go-playground/universal-translator v0.18.0 // indirect
+	github.com/gofrs/uuid v4.3.1+incompatible // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/google/go-querystring v1.0.0 // indirect
 	github.com/gopherjs/gopherjs v0.0.0-20181017120253-0766667cb4d1 // indirect
