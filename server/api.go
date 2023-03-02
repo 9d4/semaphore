@@ -202,11 +202,17 @@ func (s *apiServer) handleUsersStore(c *fiber.Ctx) error {
 		return fiber.ErrInternalServerError
 	}
 
+	hashedPwd, err := util.HashString(util.StringToBytes(body.Password))
+	if err != nil {
+		jww.ERROR.Println("unable to hash password:", err)
+		return fiber.ErrInternalServerError
+	}
+
 	usr := &user.User{
 		Email:     body.Email,
 		FirstName: body.FirstName,
 		LastName:  body.LastName,
-		Password:  body.Password,
+		Password:  hashedPwd,
 	}
 
 	err = user.Validate(usr)
@@ -215,7 +221,13 @@ func (s *apiServer) handleUsersStore(c *fiber.Ctx) error {
 		return replyValidationErrors(c, validationErrors)
 	}
 
-	//TODO: save user to be implemented
+	err = user.NewStore(s.db).Create(usr)
+	if err != nil {
+		jww.ERROR.Println("unable to store user on register:", err)
+
+		return fiber.ErrInternalServerError
+	}
+
 	c.SendStatus(fiber.StatusCreated)
 	return c.JSON(usr)
 }

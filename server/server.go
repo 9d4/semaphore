@@ -3,6 +3,7 @@ package server
 import (
 	"errors"
 	"fmt"
+	"github.com/9d4/semaphore/store"
 	"log"
 	"os"
 	"sort"
@@ -166,6 +167,11 @@ func Start(opts ...Option) (srvErr <-chan error, oauthSrvErr <-chan error) {
 		Username: config.RedisUsername,
 		Password: config.RedisPassword,
 	})
+
+	// auto migrate
+	fmt.Print("Auto Migrating...")
+	store.MigrateAll(db)
+	fmt.Println("\rAuto Migrating...done.")
 
 	srv := &server{
 		Config: config,
