@@ -3,24 +3,20 @@ package server
 import (
 	"errors"
 	"fmt"
+	"github.com/9d4/semaphore/database"
 	"github.com/9d4/semaphore/store"
-	"log"
-	"os"
 	"sort"
 	"strings"
 	"time"
 
 	"github.com/9d4/semaphore/auth"
 	errs "github.com/9d4/semaphore/errors"
+	"github.com/9d4/semaphore/user"
 	"github.com/9d4/semaphore/util"
 	"github.com/go-redis/redis/v9"
-	jww "github.com/spf13/jwalterweatherman"
-	"gorm.io/driver/postgres"
-	"gorm.io/gorm/logger"
-
-	"github.com/9d4/semaphore/user"
 	"github.com/gofiber/fiber/v2"
 	fiberlogger "github.com/gofiber/fiber/v2/middleware/logger"
+	jww "github.com/spf13/jwalterweatherman"
 	"github.com/spf13/viper"
 	"gorm.io/gorm"
 )
@@ -135,28 +131,12 @@ func Start(opts ...Option) (srvErr <-chan error, oauthSrvErr <-chan error) {
 		}
 	}
 
-	dbLogFile, err := os.OpenFile("semaphore.db.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
-	if err != nil {
-		log.Println("Unable to create log file:", err)
-	}
-	dbLogger := logger.New(
-		log.New(dbLogFile, "\r\n", log.LstdFlags), // io writer
-		logger.Config{
-			SlowThreshold:             time.Millisecond, // Slow SQL threshold
-			LogLevel:                  logger.Info,      // Log level
-			IgnoreRecordNotFoundError: true,             // Ignore ErrRecordNotFound error for logger
-			Colorful:                  false,            // Disable color
-		},
-	)
-	dsn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
-		config.DBHost,
-		config.DBPort,
-		config.DBUsername,
-		config.DBPassword,
-		config.DBName,
-	)
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
-		Logger: dbLogger,
+	db, err := database.ConnectDB(&database.Config{
+		Host:     config.DBHost,
+		Port:     config.DBPort,
+		Database: config.DBName,
+		Username: config.DBUsername,
+		Password: config.DBPassword,
 	})
 	if err != nil {
 		jww.FATAL.Fatal(err)
