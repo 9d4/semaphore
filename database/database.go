@@ -1,7 +1,9 @@
 package database
 
 import (
+	"context"
 	"fmt"
+	"github.com/go-redis/redis/v9"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -44,4 +46,21 @@ func ConnectDB(config *Config) (*gorm.DB, error) {
 	}
 
 	return db, nil
+}
+
+// ConnectRDB connects to Redis Database
+func ConnectRDB(config *RedisConfig) (*redis.Client, error) {
+	rdb := redis.NewClient(&redis.Options{
+		Addr:     config.Address,
+		Username: config.Username,
+		Password: config.Password,
+		DB:       config.DB,
+	})
+
+	_, err := rdb.Ping(context.Background()).Result()
+	if err != nil {
+		return nil, err
+	}
+
+	return rdb, nil
 }

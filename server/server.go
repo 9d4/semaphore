@@ -139,14 +139,18 @@ func Start(opts ...Option) (srvErr <-chan error, oauthSrvErr <-chan error) {
 		Password: config.DBPassword,
 	})
 	if err != nil {
-		jww.FATAL.Fatal(err)
+		jww.FATAL.Fatalf("unable to connect to database: %s", err)
 	}
 
-	rdb := redis.NewClient(&redis.Options{
-		Addr:     config.RedisAddress,
+	rdb, err := database.ConnectRDB(&database.RedisConfig{
+		Address:  config.RedisAddress,
 		Username: config.RedisUsername,
 		Password: config.RedisPassword,
+		DB:       0,
 	})
+	if err != nil {
+		jww.FATAL.Fatalf("unable to connect to redis database: %s", err)
+	}
 
 	// auto migrate
 	fmt.Print("Auto Migrating...")
