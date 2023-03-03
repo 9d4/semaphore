@@ -11,6 +11,7 @@ import (
 var defaultConfig *Config = &Config{
 	v:             nil,
 	Address:       "0.0.0.0:3500",
+	AddressOAuth2: "0.0.0.0:3501",
 	DBHost:        "127.0.0.1",
 	DBPort:        5432,
 	DBName:        "semaphore",
@@ -35,7 +36,10 @@ type Config struct {
 	KeyBytes []byte
 
 	// Address to listen on
-	Address    string
+	Address string
+	// Address for oauth2 server to listen on
+	AddressOAuth2 string
+
 	DBHost     string
 	DBPort     int
 	DBName     string
@@ -82,6 +86,7 @@ func parseViper(v *viper.Viper, defaultConf *Config) *Config {
 	}
 
 	c.Address = getOrDefault(v.GetString("address"), defaultConf.Address)
+	c.AddressOAuth2 = getOrDefault(v.GetString("address-oauth2"), defaultConf.AddressOAuth2)
 	c.DBHost = getOrDefault(v.GetString("db-host"), defaultConf.DBHost)
 	c.DBPort = getOrDefault(v.GetInt("db-port"), defaultConf.DBPort)
 	c.DBName = getOrDefault(v.GetString("db-name"), defaultConf.DBName)

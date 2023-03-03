@@ -2,7 +2,6 @@ package server
 
 import (
 	"errors"
-	"fmt"
 	"github.com/9d4/semaphore/auth"
 	"github.com/9d4/semaphore/oauth2"
 	"github.com/9d4/semaphore/oauth2/generates"
@@ -22,6 +21,8 @@ import (
 	"strconv"
 	"strings"
 )
+
+var oAuth2Server *oauthServer
 
 var ErrSuspended = errors.New("waiting user authorization")
 
@@ -101,15 +102,8 @@ func newOauthServer(db *gorm.DB, rdb *redis.Client, config *Config) *oauthServer
 }
 
 func (s *oauthServer) Listen() error {
-	address := strings.Split(s.Config.Address, ":")
-	newPort, err := strconv.Atoi(address[1])
-	if err != nil {
-		jww.FATAL.Fatal(err)
-	}
-	newAddr := fmt.Sprint(address[0], ":", newPort+1)
-
-	jww.INFO.Println("OAuth Server listening on", newAddr)
-	return http.ListenAndServe(newAddr, s.mux)
+	jww.INFO.Println("OAuth Server listening on", s.AddressOAuth2)
+	return http.ListenAndServe(s.AddressOAuth2, s.mux)
 }
 
 // check if user authenticated or not and consent screen

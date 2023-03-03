@@ -74,6 +74,7 @@ func loadConfig() {
 
 func loadFlags() {
 	serverFlags.StringP("address", "a", "0.0.0.0:3500", "Address to listen on")
+	serverFlags.String("address-oauth2", "0.0.0.0:3501", "Address for OAuth2 server to listen on")
 
 	globalFlags.String("db-host", "127.0.0.1", "Database host")
 	globalFlags.String("db-port", "5432", "Database port")
